@@ -13,6 +13,7 @@ if [ -f "$AGENTV_ROOT/.env" ]; then
 fi
 : "${AGENTS_DIR:=$AGENTV_ROOT/agents}"
 : "${SHARED_DIR:=$AGENTV_ROOT/shared}"
+: "${TEAM_ACTIVITY:=$SHARED_DIR/team_activity.jsonl}"   # cross-agent message log
 
 # --- mysql helper (uses .env creds) ---
 agentv_mysql() {
