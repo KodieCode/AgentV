@@ -14,6 +14,8 @@ fi
 : "${AGENTS_DIR:=$AGENTV_ROOT/agents}"
 : "${SHARED_DIR:=$AGENTV_ROOT/shared}"
 : "${TEAM_ACTIVITY:=$SHARED_DIR/team_activity.jsonl}"   # cross-agent message log
+: "${CONTROL_PLANE_API:=http://localhost:${SERVER_PORT:-8100}}"  # dashboard API base
+: "${DEFAULT_AGENT_MODEL:=claude-sonnet-4-6}"
 
 # --- mysql helper (uses .env creds) ---
 agentv_mysql() {
@@ -39,4 +41,12 @@ agentv_agent_inbox() {
     SELECT COALESCE(NULLIF(inbox_path,''),
                     CONCAT('$AGENTS_DIR/', slug, '/notifications/inbox.jsonl'))
     FROM agents WHERE slug = '$slug' LIMIT 1;"
+}
+
+# Model for an agent (from agents.model), falling back to the default. Replaces
+# the legacy agent-model.sh path dependency — skills pass --model from this.
+agentv_agent_model() {
+  local slug="$1" m
+  m=$(agentv_mysql -e "SELECT model FROM agents WHERE slug='$slug' LIMIT 1;")
+  [ -n "$m" ] && echo "$m" || echo "$DEFAULT_AGENT_MODEL"
 }

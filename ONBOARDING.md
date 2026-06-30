@@ -57,7 +57,7 @@ Runs, in order:
 ## Build status (phased)
 
 - [x] **A — Scaffold + control-plane schema** (migrations, knexfile, env, bootstrap skeleton)
-- [ ] **B — Shared layer** (skills, notify/routing, safety nets)
+- [x] **B — Shared layer** (reports sink + DB-driven roster; notify/routing; safety nets: watchdog/heartbeat/snapshot/nightly-wrap-up; generic skills: agent-wrap-up/weekly-review/build-idea/submit-idea/verify-done; fleet-manager skills: daily-digest→reports/team-review/skill-watch/auto-pr-review)
 - [ ] **C — Control-plane dashboard** (api + app, generalised)
 - [ ] **D — Agent templates + 2 starter agents + scripted provisioning**
 - [ ] **E — Onboarding polish + dry-run a fresh install**
