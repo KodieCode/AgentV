@@ -17,8 +17,13 @@ echo "== system tools =="
 for t in node npm pm2 nginx certbot tmux mysql git gh jq claude; do need "$t"; done
 
 echo "== env =="
-for v in MYSQL_HOST MYSQL_USER MYSQL_PASSWORD MYSQL_DATABASE JWT_SECRET APP_DOMAIN_BASE; do
+# Required to launch the control plane:
+for v in MYSQL_HOST MYSQL_USER MYSQL_PASSWORD MYSQL_DATABASE JWT_SECRET; do
   if [ -n "${!v:-}" ]; then printf "  ✓ %s set\n" "$v"; else printf "  ✗ %s empty\n" "$v"; fail=1; fi
+done
+# Optional (only needed when the fleet builds public apps / wants SSL) — warn, don't fail:
+for v in APP_DOMAIN_BASE DASHBOARD_DOMAIN GITHUB_ORG; do
+  [ -n "${!v:-}" ] && printf "  ✓ %s set\n" "$v" || printf "  · %s unset (optional)\n" "$v"
 done
 
 echo "== database reachable =="

@@ -29,15 +29,21 @@ Also needed before bootstrap:
 ```bash
 git clone git@github.com:KodieCode/AgentV.git
 cd AgentV
-cp .env.example .env
-# Fill .env: MYSQL_*, JWT_SECRET (openssl rand -hex 48), APP_DOMAIN_BASE,
-# DASHBOARD_DOMAIN, OPENROUTER_API_KEY, GITHUB_ORG, MAIL_*, ADMIN_NOTIFY_TO
+./setup/configure.sh        # guided wizard — prompts, auto-gens JWT, tests DB, writes .env, preflight
 ```
+The wizard offers to run bootstrap at the end. (Manual path: `cp .env.example .env` and edit by hand, then run bootstrap yourself.)
+
+**Two one-time logins the wizard can't do for you** (OAuth — run once on the box):
+```bash
+gh auth login      # GitHub, for PRs
+claude             # Claude Code, log in once
+```
+If you set a `DASHBOARD_DOMAIN`, point its DNS at this server before bootstrap so certbot can issue SSL.
 
 ## 2. Bootstrap
 
 ```bash
-./setup/bootstrap.sh
+./setup/bootstrap.sh        # (the wizard offers to run this for you)
 ```
 
 Runs, in order:
