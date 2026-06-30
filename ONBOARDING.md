@@ -58,6 +58,6 @@ Runs, in order:
 
 - [x] **A — Scaffold + control-plane schema** (migrations, knexfile, env, bootstrap skeleton)
 - [x] **B — Shared layer** (reports sink + DB-driven roster; notify/routing; safety nets: watchdog/heartbeat/snapshot/nightly-wrap-up; generic skills: agent-wrap-up/weekly-review/build-idea/submit-idea/verify-done; fleet-manager skills: daily-digest→reports/team-review/skill-watch/auto-pr-review)
-- [ ] **C — Control-plane dashboard** (api + app, generalised)
-- [ ] **D — Agent templates + 2 starter agents + scripted provisioning**
-- [ ] **E — Onboarding polish + dry-run a fresh install**
+- [x] **C — Control-plane dashboard** (api + app, generalised). Verified on the dev box: API boots, `/healthz` green, DB up, scheduler runs, agent-token auth works (`/v1/ideas`, `/v1/agents`, `/v1/reports`); app builds clean (`vite build`).
+- [x] **D — Agent templates + 2 starter agents + scripted provisioning**. Verified: `seed-starter-agents.sh` provisions fleet-manager + finance-builder — DB rows, rendered identities (no stray placeholders), shared-skills symlink resolves, `.api-token` signed + authenticates, notify routing + round-trip, workflows + non-NULL schedules.
+- [x] **E — Bootstrap wired end-to-end** (preflight → migrate → seed → provision → start). Components individually verified against a throwaway DB on the dev box. **Remaining for the real launch:** a single `bootstrap.sh` run on the target server (needs the real `.env`, a domain, and nginx/certbot/pm2 — `provision.sh`/`start.sh` no-op safely without them here).

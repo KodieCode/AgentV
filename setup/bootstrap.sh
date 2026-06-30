@@ -25,16 +25,33 @@ else
   echo "  ! db/ not yet a node package — run: cd db && npm init -y && npm i knex mysql2 dotenv (phase A wiring)"
 fi
 
-# 4. seed starter agents                                   [phase D]
+# 4. seed starter agents (fleet-manager + finance-builder)
 echo "── [4/6] seed starter agents"
-if [ -x provisioning/seed-starter-agents.sh ]; then provisioning/seed-starter-agents.sh; else echo "  ⧗ pending (phase D)"; fi
+if [ -x provisioning/seed-starter-agents.sh ]; then
+  provisioning/seed-starter-agents.sh
+elif [ -x provisioning/new-agent.sh ]; then
+  # No bulk seeder — provision the two starter agents one at a time.
+  # new-agent.sh is expected to be idempotent (skip an agent that already exists).
+  for a in fleet-manager finance-builder; do
+    echo "  • provisioning starter agent: $a"
+    provisioning/new-agent.sh "$a" || echo "  ! new-agent.sh failed for $a — continuing"
+  done
+else
+  echo "  ⧗ no provisioning/seed-starter-agents.sh or provisioning/new-agent.sh yet (phase D) — skipping seed"
+fi
 
-# 5. provision — nginx/certbot/pm2/tmux for dashboard+agents  [phase C/D]
-echo "── [5/6] provision (nginx/certbot/pm2/tmux)"
-if [ -x setup/provision.sh ]; then setup/provision.sh; else echo "  ⧗ pending (phase C/D)"; fi
+# 4b. regenerate notify routing.conf from whatever agents now exist in the DB.
+if [ -x shared/skills/notify/generate-routing-conf.sh ]; then
+  echo "── regenerating notify routing.conf"
+  shared/skills/notify/generate-routing-conf.sh || echo "  ! routing.conf gen skipped (no active agents yet)"
+fi
 
-# 6. start                                                 [phase C/D]
+# 5. provision — nginx/certbot for the dashboard + pm2 registration
+echo "── [5/6] provision (nginx/certbot/pm2)"
+if [ -x setup/provision.sh ]; then setup/provision.sh; else echo "  ⧗ setup/provision.sh missing"; fi
+
+# 6. start — (re)start control-plane processes + launch agent tmux sessions
 echo "── [6/6] start dashboard + agents"
-if [ -x setup/start.sh ]; then setup/start.sh; else echo "  ⧗ pending (phase C/D)"; fi
+if [ -x setup/start.sh ]; then setup/start.sh; else echo "  ⧗ setup/start.sh missing"; fi
 
-echo "✔ bootstrap finished (phases marked ⧗ land in later versions — see ONBOARDING.md)"
+echo "✔ bootstrap finished — see ONBOARDING.md for verification steps."

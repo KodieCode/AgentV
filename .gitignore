@@ -15,3 +15,8 @@
 node_modules/
 dist/
 .DS_Store
+
+# Provision-time / runtime (created on deploy, never committed)
+**/.claude/skills/shared
+**/dist/
+control-plane/*/dist/
