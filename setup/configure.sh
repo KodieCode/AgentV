@@ -50,7 +50,11 @@ fi
 if [ -n "$DASHBOARD_DOMAIN" ]; then CONTROL_PLANE_API="https://$DASHBOARD_DOMAIN"; else CONTROL_PLANE_API="http://localhost:$SERVER_PORT"; fi
 
 bold "3) Fleet + GitHub"
-ask FLEET_MANAGER_SLUG "Fleet-manager agent slug" "${FLEET_MANAGER_SLUG:-fleet-manager}"
+echo "  The single starter agent is the coordinator — name it whatever you like (Norman, AgentV, …)."
+ask FLEET_MANAGER_NAME "Fleet-manager display name" "${FLEET_MANAGER_NAME:-Fleet Manager}"
+# Derive a slug from the name unless one was already set: lowercase, spaces→-, strip junk.
+_def_slug="$(printf '%s' "$FLEET_MANAGER_NAME" | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | tr -cd 'a-z0-9-' | sed 's/--*/-/g; s/^-//; s/-$//')"
+ask FLEET_MANAGER_SLUG "Fleet-manager slug (dir/session/DB)" "${FLEET_MANAGER_SLUG:-${_def_slug:-fleet-manager}}"
 ask GITHUB_ORG "GitHub org for repos (blank ok for now)" "${GITHUB_ORG:-}"
 ask APP_DOMAIN_BASE "Wildcard base for apps the fleet builds (blank ok)" "${APP_DOMAIN_BASE:-}"
 
@@ -84,6 +88,7 @@ DASHBOARD_APP_PORT=$DASHBOARD_APP_PORT
 APP_DOMAIN_BASE=$APP_DOMAIN_BASE
 PORT_RANGE_FROM=${PORT_RANGE_FROM:-8200}
 PORT_RANGE_TO=${PORT_RANGE_TO:-8999}
+FLEET_MANAGER_NAME=$FLEET_MANAGER_NAME
 FLEET_MANAGER_SLUG=$FLEET_MANAGER_SLUG
 GITHUB_ORG=$GITHUB_ORG
 OPENROUTER_API_KEY=$OPENROUTER_API_KEY

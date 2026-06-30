@@ -16,6 +16,8 @@ fi
 : "${TEAM_ACTIVITY:=$SHARED_DIR/team_activity.jsonl}"   # cross-agent message log
 : "${CONTROL_PLANE_API:=http://localhost:${SERVER_PORT:-8100}}"  # dashboard API base
 : "${DEFAULT_AGENT_MODEL:=claude-sonnet-4-6}"
+: "${FLEET_MANAGER_SLUG:=fleet-manager}"        # the coordinating agent's slug
+: "${FLEET_MANAGER_NAME:=Fleet Manager}"        # its display name (operator-chosen: Norman, AgentV, …)
 
 # --- mysql helper (uses .env creds) ---
 agentv_mysql() {

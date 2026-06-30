@@ -25,19 +25,12 @@ else
   echo "  ! db/ not yet a node package — run: cd db && npm init -y && npm i knex mysql2 dotenv (phase A wiring)"
 fi
 
-# 4. seed starter agents (fleet-manager + finance-builder)
-echo "── [4/6] seed starter agents"
-if [ -x provisioning/seed-starter-agents.sh ]; then
-  provisioning/seed-starter-agents.sh
-elif [ -x provisioning/new-agent.sh ]; then
-  # No bulk seeder — provision the two starter agents one at a time.
-  # new-agent.sh is expected to be idempotent (skip an agent that already exists).
-  for a in fleet-manager finance-builder; do
-    echo "  • provisioning starter agent: $a"
-    provisioning/new-agent.sh "$a" || echo "  ! new-agent.sh failed for $a — continuing"
-  done
+# 4. seed the fleet-manager (the ONLY starter agent — it creates the rest later)
+echo "── [4/6] seed fleet-manager"
+if [ -x provisioning/seed-fleet-manager.sh ]; then
+  provisioning/seed-fleet-manager.sh
 else
-  echo "  ⧗ no provisioning/seed-starter-agents.sh or provisioning/new-agent.sh yet (phase D) — skipping seed"
+  echo "  ⧗ provisioning/seed-fleet-manager.sh missing — skipping seed"
 fi
 
 # 4b. regenerate notify routing.conf from whatever agents now exist in the DB.

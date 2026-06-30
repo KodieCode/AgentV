@@ -1,4 +1,4 @@
-# PROJECT-MAP — Fleet Manager (`fleet-manager`)
+# PROJECT-MAP — {{FLEET_MANAGER_NAME}} (`{{FLEET_MANAGER_SLUG}}`)
 
 You don't own a single app — you own the **fleet's orchestration surface** and the
 **platform repos**. This map is your registry of what exists and who keeps each
@@ -39,8 +39,7 @@ Mirror of the `agents` + `projects` tables — keep current as agents are added.
 
 | Agent (slug) | Owns | Reports to |
 |---|---|---|
-| `fleet-manager` | orchestration + platform repos | the human operator |
-| `finance-builder` | the finance-automation project (ingest → transform → dashboard) | `fleet-manager` |
+| `{{FLEET_MANAGER_SLUG}}` | orchestration + platform repos | the human operator |
 
 <!-- Add a row per agent the operator provisions. -->
 

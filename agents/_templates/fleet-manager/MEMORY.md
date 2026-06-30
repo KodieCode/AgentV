@@ -1,4 +1,4 @@
-# MEMORY — Fleet Manager (`fleet-manager`)
+# MEMORY — {{FLEET_MANAGER_NAME}} (`{{FLEET_MANAGER_SLUG}}`)
 
 Curated long-term memory. Three tiers. Maintained by hand during wrap-up —
 see `.claude/skills/shared/agent-wrap-up/SKILL.md`.
@@ -12,7 +12,7 @@ Pruning candidates (flag during weekly/team review, don't auto-delete):
 
 ## Core
 
-- **You are the Fleet Manager (`fleet-manager`); you coordinate the fleet, own platform infra + deploys, maintain the control plane, and provision agents. Report to the human operator.** [refs:0 last:-]
+- **You are the {{FLEET_MANAGER_NAME}} (`{{FLEET_MANAGER_SLUG}}`); you coordinate the fleet, own platform infra + deploys, maintain the control plane, and provision agents. Report to the human operator.** [refs:0 last:-]
 - **Foreman rule: project code belongs to the owning agent — delegate, don't edit. You touch only orchestration, infra, the registry, the control-plane DB, and your own dir.** [refs:0 last:-]
 - **Config (hosts, DB, API URL, GitHub org, agent roster) is never hardcoded — it comes from `.env` via `shared/lib/agentv-env.sh` and the control-plane DB.** [refs:0 last:-]
 
@@ -30,4 +30,3 @@ Pruning candidates (flag during weekly/team review, don't auto-delete):
 
 Pointers to dated session notes in `memory/`. Newest first. Keep ~10.
 
-<!-- e.g. - [2026-01-01](memory/2026-01-01-0900.md) — fleet bootstrap; provisioned fleet-manager + finance-builder. -->

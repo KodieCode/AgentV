@@ -50,20 +50,41 @@ Runs, in order:
 1. **preflight** — verifies the system prerequisites + a reachable DB
 2. **install** — `npm install` for the control-plane (and per-package deps)
 3. **migrate** — builds the control-plane schema in your MySQL (`knex migrate:latest`)
-4. **seed** — creates the two starter agents (fleet-manager, finance-builder)  _(phase D)_
+4. **seed** — creates the single starter agent: the fleet-manager (named whatever you chose in the wizard). It provisions all other agents itself, later.
 5. **provision** — wires nginx + certbot for the dashboard, pm2 entries, agent tmux sessions  _(phase C/D)_
 6. **start** — launches the dashboard + agent sessions
 
 ## 3. Verify
 
-- Dashboard reachable at `https://$DASHBOARD_DOMAIN`
-- Two agents show as `idle` in the roster
-- A test notification routes between agents
+- Dashboard reachable at `https://$DASHBOARD_DOMAIN` (or `http://localhost:$DASHBOARD_APP_PORT` locally)
+- The fleet-manager shows as `idle` in the roster
+- `GET /healthz` returns `{"ok":true,"db":"up"}`
+
+## 4. Using the fleet
+
+Bootstrap already **started** the fleet-manager — it's a long-lived `tmux` session
+running `claude --remote-control "<your name>"`. You don't start it; you reach it,
+three ways:
+
+1. **Dashboard (primary):** open the dashboard → roster → click the fleet-manager →
+   **Terminal** tab. That's a live websocket into its session — type to it in the browser.
+   The dashboard also has the **Ideas** kanban and **Briefings** (digests/reviews) views.
+2. **Claude Desktop / mobile:** because it launched with `--remote-control`, it appears
+   in the Claude app's session picker (requires `claude` logged in on the box). Attach + chat from anywhere.
+3. **SSH + tmux:** `ssh <server>` then `tmux attach -t <slug>`.
+
+**Day one:** open the fleet-manager and tell it what you want to build. It dispatches,
+and **provisions new agents itself** via `provisioning/new-agent.sh` as the work grows —
+you don't hand-create them.
+
+> Prereq for remote-control + agent sessions: `claude` must be logged in on the server
+> (one-time). If a session shows "Not logged in", attach once and run `/login`; restarts
+> then auto-register.
 
 ## Build status (phased)
 
 - [x] **A — Scaffold + control-plane schema** (migrations, knexfile, env, bootstrap skeleton)
 - [x] **B — Shared layer** (reports sink + DB-driven roster; notify/routing; safety nets: watchdog/heartbeat/snapshot/nightly-wrap-up; generic skills: agent-wrap-up/weekly-review/build-idea/submit-idea/verify-done; fleet-manager skills: daily-digest→reports/team-review/skill-watch/auto-pr-review)
 - [x] **C — Control-plane dashboard** (api + app, generalised). Verified on the dev box: API boots, `/healthz` green, DB up, scheduler runs, agent-token auth works (`/v1/ideas`, `/v1/agents`, `/v1/reports`); app builds clean (`vite build`).
-- [x] **D — Agent templates + 2 starter agents + scripted provisioning**. Verified: `seed-starter-agents.sh` provisions fleet-manager + finance-builder — DB rows, rendered identities (no stray placeholders), shared-skills symlink resolves, `.api-token` signed + authenticates, notify routing + round-trip, workflows + non-NULL schedules.
+- [x] **D — Agent template + fleet-manager + scripted provisioning**. The fleet-manager is the ONLY starter agent; it creates the rest via `new-agent.sh`. Its name/slug are operator-chosen (wizard) and rendered from `agents/_templates/fleet-manager/`. Verified end-to-end (e.g. as "Norman"): DB row, rendered identity (no stray placeholders), symlink resolves, `.api-token` signed + authenticates, notify routing + round-trip, workflows + non-NULL schedules.
 - [x] **E — Bootstrap wired end-to-end** (preflight → migrate → seed → provision → start). Components individually verified against a throwaway DB on the dev box. **Remaining for the real launch:** a single `bootstrap.sh` run on the target server (needs the real `.env`, a domain, and nginx/certbot/pm2 — `provision.sh`/`start.sh` no-op safely without them here).
