@@ -1,6 +1,8 @@
 // AgentV — knex config. Connection comes entirely from .env so the same repo
 // runs against any deployment's MySQL by filling .env at onboarding.
-require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
+// override:true — .env is the source of truth, even if the shell already has
+// MYSQL_* exported (avoids connecting to the wrong DB from ambient env vars).
+require('dotenv').config({ path: require('path').resolve(__dirname, '../.env'), override: true });
 
 const base = {
   client: 'mysql2',
