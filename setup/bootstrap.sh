@@ -47,11 +47,15 @@ if [ -x shared/skills/notify/generate-routing-conf.sh ]; then
 fi
 
 # 5. provision — nginx/certbot for the dashboard + pm2 registration
-echo "── [5/6] provision (nginx/certbot/pm2)"
+echo "── [5/7] provision (nginx/certbot/pm2)"
 if [ -x setup/provision.sh ]; then setup/provision.sh; else echo "  ⧗ setup/provision.sh missing"; fi
 
+# 5b. build the dashboard app pointed at the right API URL (VITE_API_URL).
+echo "── [6/7] build dashboard app"
+if [ -x setup/build-app.sh ]; then setup/build-app.sh; else echo "  ⧗ setup/build-app.sh missing"; fi
+
 # 6. start — (re)start control-plane processes + launch agent tmux sessions
-echo "── [6/6] start dashboard + agents"
+echo "── [7/7] start dashboard + agents"
 if [ -x setup/start.sh ]; then setup/start.sh; else echo "  ⧗ setup/start.sh missing"; fi
 
 echo "✔ bootstrap finished — see ONBOARDING.md for verification steps."
