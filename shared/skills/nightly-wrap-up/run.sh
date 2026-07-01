@@ -14,9 +14,12 @@ DRY=0; [ "${1:-}" = "--dry-run" ] && DRY=1
 LOG="$SHARED_DIR/skills/nightly-wrap-up/logs/nightly-wrap-up.log"
 mkdir -p "$(dirname "$LOG")"
 NOTIFY="$SHARED_DIR/skills/notify/notify.sh"
+# Runs at 03:00, so the work being wrapped is the day that just ended (yesterday)
+# plus any early-hours work today. Gate on the window since yesterday 00:00.
 TODAY=$(date +%Y-%m-%d)
+YESTERDAY=$(date -d 'yesterday' +%Y-%m-%d)
 NOW=$(date -u -Iseconds)
-MSG="Nightly automated wrap-up (03:00). You had activity today — save your daily note + promote any durable rules to memory per your wrap-up skill. No reply needed unless you're blocked."
+MSG="Nightly automated wrap-up (03:00). You had activity yesterday — save your daily note + promote any durable rules to memory per your wrap-up skill. No reply needed unless you're blocked."
 
 echo "[$NOW] nightly-wrap-up tick (dry=$DRY)" >> "$LOG"
 woke=0; idle=0; busy=0
@@ -25,11 +28,11 @@ while IFS=':' read -r slug session dir; do
   tmux has-session -t "$session" 2>/dev/null || continue
 
   active=0
-  if [ -f "$TEAM_ACTIVITY" ] && grep -h "$TODAY" "$TEAM_ACTIVITY" 2>/dev/null | grep -q "\"from\": \"$slug\""; then
+  if [ -f "$TEAM_ACTIVITY" ] && grep -hE "$YESTERDAY|$TODAY" "$TEAM_ACTIVITY" 2>/dev/null | grep -q "\"from\": \"$slug\""; then
     active=1
   fi
   if [ "$active" -eq 0 ] && [ -d "$dir" ]; then
-    if find "$dir" -type f -newermt "$TODAY 00:00:00" \
+    if find "$dir" -type f -newermt "$YESTERDAY 00:00:00" \
          -not -path '*/node_modules/*' -not -path '*/.git/*' \
          -not -path '*/notifications/*' -not -path '*/pane-snapshots/*' \
          -not -name '*marker*' -not -name '*.log' 2>/dev/null | grep -q .; then
