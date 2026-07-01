@@ -329,6 +329,6 @@ WF
 )
 Then launch the session (model + display name from the DB row):
        tmux new-session -d -s $TMUX -c "$AGENT_DIR"
-       tmux send-keys -t $TMUX 'claude --dangerously-skip-permissions --model $MODEL --remote-control "$DISPLAY_NAME"' Enter
+       tmux send-keys -t $TMUX 'claude --permission-mode auto --model $MODEL --remote-control "$DISPLAY_NAME"' Enter
 ────────────────────────────────────────────────────────────────────────────
 EOF
