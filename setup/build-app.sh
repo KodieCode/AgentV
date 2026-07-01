@@ -19,5 +19,5 @@ fi
 
 echo "VITE_API_URL=$API_URL" > "$APP_DIR/.env"
 echo "── building dashboard app (VITE_API_URL=$API_URL)"
-( cd "$APP_DIR" && npm install --no-audit --no-fund >/dev/null 2>&1 && npm run build >/dev/null 2>&1 )
+( cd "$APP_DIR" && npm install --no-audit --no-fund && npm run build )
 echo "  ✓ app built → control-plane/app/dist"
