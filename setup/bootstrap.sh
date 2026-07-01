@@ -15,7 +15,7 @@ bash setup/preflight.sh
 echo "── [2/6] install"
 if [ -f db/package.json ]; then (cd db && npm install --no-audit --no-fund); fi
 if [ -d control-plane/api ] && [ -f control-plane/api/package.json ]; then (cd control-plane/api && npm install --no-audit --no-fund); fi
-if [ -d control-plane/app ] && [ -f control-plane/app/package.json ]; then (cd control-plane/app && npm install --no-audit --no-fund); fi
+if [ -d control-plane/app ] && [ -f control-plane/app/package.json ]; then (cd control-plane/app && npm install --no-audit --no-fund --include=dev); fi
 
 # 3. migrate — build the control-plane schema
 echo "── [3/6] migrate (control-plane schema)"

@@ -2,6 +2,10 @@
 # build-app — build the dashboard SPA pointed at the right API URL.
 # The API is served at <dashboard>/v1 (provision.sh proxies it), so the app
 # calls the same origin. Derives VITE_API_URL:
+#
+# Note: .env sets NODE_ENV=production (correct for the API runtime), which makes
+# `npm install` skip devDependencies — but vite lives there. Force --include=dev
+# so the build toolchain is always present regardless of NODE_ENV.
 #   - DASHBOARD_DOMAIN set  -> https://$DASHBOARD_DOMAIN   (public, same-origin /v1)
 #   - otherwise             -> http://localhost:$SERVER_PORT  (local dev)
 set -euo pipefail
@@ -19,5 +23,5 @@ fi
 
 echo "VITE_API_URL=$API_URL" > "$APP_DIR/.env"
 echo "── building dashboard app (VITE_API_URL=$API_URL)"
-( cd "$APP_DIR" && npm install --no-audit --no-fund && npm run build )
+( cd "$APP_DIR" && npm install --no-audit --no-fund --include=dev && npm run build )
 echo "  ✓ app built → control-plane/app/dist"
