@@ -9,7 +9,7 @@ CREATE TABLE `agents` (
   `active` tinyint(1) NOT NULL DEFAULT '1',
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `model` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'claude-sonnet-4-6',
+  `model` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'claude-sonnet-5',
   `tmux_session` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `inbox_path` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY (`id`),

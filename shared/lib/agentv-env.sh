@@ -15,7 +15,7 @@ fi
 : "${SHARED_DIR:=$AGENTV_ROOT/shared}"
 : "${TEAM_ACTIVITY:=$SHARED_DIR/team_activity.jsonl}"   # cross-agent message log
 : "${CONTROL_PLANE_API:=http://localhost:${SERVER_PORT:-8100}}"  # dashboard API base
-: "${DEFAULT_AGENT_MODEL:=claude-sonnet-4-6}"
+: "${DEFAULT_AGENT_MODEL:=claude-sonnet-5}"
 : "${FLEET_MANAGER_SLUG:=fleet-manager}"        # the coordinating agent's slug
 : "${FLEET_MANAGER_NAME:=Fleet Manager}"        # its display name (operator-chosen: Norman, AgentV, …)
 

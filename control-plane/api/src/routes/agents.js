@@ -370,7 +370,7 @@ router.post('/', async (req, res) => {
   const id = crypto.randomUUID();
   await db('agents').insert({
     id, slug, name, description, avatar_url,
-    model: model || process.env.DEFAULT_AGENT_MODEL || 'claude-sonnet-4-6',
+    model: model || process.env.DEFAULT_AGENT_MODEL || 'claude-sonnet-5',
     active, tmux_session, inbox_path,
   });
   const row = await db('agents').where({ id }).first();

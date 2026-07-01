@@ -47,7 +47,7 @@ SHARED_SKILLS_REL="../../shared/skills"   # symlink target, relative to <dir>/.c
 # defaults + arg parsing
 # ---------------------------------------------------------------------------
 SLUG=""; NAME=""; ROLE=""
-MODEL="${DEFAULT_AGENT_MODEL:-claude-sonnet-4-6}"
+MODEL="${DEFAULT_AGENT_MODEL:-claude-sonnet-5}"
 TMUX=""; INBOX=""; REPORTS_TO="the fleet-manager"; FLEET_MANAGER="fleet-manager"
 SERVER_CODE="CP"; PROJECTS=""; PERSONA=""
 WITH_WORKFLOWS=0; WEEKLY_CRON="30 4 * * 0"

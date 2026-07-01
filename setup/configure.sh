@@ -73,7 +73,7 @@ fi
 
 bold "6) AI (optional at 2-agent stage)"
 asksecret OPENROUTER_API_KEY "OpenRouter API key (image-gen; blank ok)"
-ask DEFAULT_AGENT_MODEL "Default agent model" "${DEFAULT_AGENT_MODEL:-claude-sonnet-4-6}"
+ask DEFAULT_AGENT_MODEL "Default agent model" "${DEFAULT_AGENT_MODEL:-claude-sonnet-5}"
 
 # --- write .env ---
 umask 077

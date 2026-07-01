@@ -16,7 +16,7 @@ const { execFile } = require('child_process');
 const db = require('../db');
 const { agentDir, sharedSkill, dashboardUrl } = require('./paths');
 
-const DEFAULT_MODEL = process.env.DEFAULT_AGENT_MODEL || 'claude-sonnet-4-6';
+const DEFAULT_MODEL = process.env.DEFAULT_AGENT_MODEL || 'claude-sonnet-5';
 
 function runShell(cmd, args, opts) {
   return new Promise((resolve, reject) => {
