@@ -39,7 +39,12 @@ else
   echo "  ✗ could not connect — you can continue, but fix creds before bootstrap."
 fi
 
-bold "2) Control-plane API + dashboard"
+bold "2) Dashboard admin login"
+echo "  The account you'll sign into the dashboard with (created at bootstrap)."
+ask ADMIN_USERNAME "Admin username" "${ADMIN_USERNAME:-admin}"
+asksecret ADMIN_PASSWORD "Admin password (blank = auto-generate + print once)"
+
+bold "3) Control-plane API + dashboard"
 ask SERVER_PORT "API port" "${SERVER_PORT:-8100}"
 ask DASHBOARD_APP_PORT "Dashboard app port" "${DASHBOARD_APP_PORT:-$((SERVER_PORT + 1))}"
 ask DASHBOARD_DOMAIN "Public dashboard domain (blank = local-only)" "${DASHBOARD_DOMAIN:-}"
@@ -49,7 +54,7 @@ if [ -n "${JWT_SECRET:-}" ]; then echo "  JWT_SECRET: keeping existing"; else
 fi
 if [ -n "$DASHBOARD_DOMAIN" ]; then CONTROL_PLANE_API="https://$DASHBOARD_DOMAIN"; else CONTROL_PLANE_API="http://localhost:$SERVER_PORT"; fi
 
-bold "3) Fleet + GitHub"
+bold "4) Fleet + GitHub"
 echo "  The single starter agent is the coordinator — name it whatever you like (Norman, AgentV, …)."
 ask FLEET_MANAGER_NAME "Fleet-manager display name" "${FLEET_MANAGER_NAME:-Fleet Manager}"
 # Derive a slug from the name unless one was already set: lowercase, spaces→-, strip junk.
@@ -58,7 +63,7 @@ ask FLEET_MANAGER_SLUG "Fleet-manager slug (dir/session/DB)" "${FLEET_MANAGER_SL
 ask GITHUB_ORG "GitHub org for repos (blank ok for now)" "${GITHUB_ORG:-}"
 ask APP_DOMAIN_BASE "Wildcard base for apps the fleet builds (blank ok)" "${APP_DOMAIN_BASE:-}"
 
-bold "4) Email relay (digests/alerts — cloud IPs are blocklisted)"
+bold "5) Email relay (digests/alerts — cloud IPs are blocklisted)"
 ask MAIL_PROVIDER "Provider (brevo|sendgrid|ses|smtp|none)" "${MAIL_PROVIDER:-none}"
 if [ "$MAIL_PROVIDER" != "none" ]; then
   asksecret MAIL_API_KEY "Relay API key"
@@ -66,7 +71,7 @@ if [ "$MAIL_PROVIDER" != "none" ]; then
   ask ADMIN_NOTIFY_TO "Admin recipient (you)" "${ADMIN_NOTIFY_TO:-}"
 fi
 
-bold "5) AI (optional at 2-agent stage)"
+bold "6) AI (optional at 2-agent stage)"
 asksecret OPENROUTER_API_KEY "OpenRouter API key (image-gen; blank ok)"
 ask DEFAULT_AGENT_MODEL "Default agent model" "${DEFAULT_AGENT_MODEL:-claude-sonnet-4-6}"
 
@@ -82,6 +87,8 @@ SERVER_PORT=$SERVER_PORT
 NODE_ENV=production
 JWT_SECRET=$JWT_SECRET
 JWT_EXPIRES_IN=7d
+ADMIN_USERNAME=$ADMIN_USERNAME
+ADMIN_PASSWORD=$ADMIN_PASSWORD
 CONTROL_PLANE_API=$CONTROL_PLANE_API
 DASHBOARD_DOMAIN=$DASHBOARD_DOMAIN
 DASHBOARD_APP_PORT=$DASHBOARD_APP_PORT

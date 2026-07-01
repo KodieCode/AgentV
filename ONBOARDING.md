@@ -50,13 +50,16 @@ Runs, in order:
 1. **preflight** — verifies the system prerequisites + a reachable DB
 2. **install** — `npm install` for the control-plane (and per-package deps)
 3. **migrate** — builds the control-plane schema in your MySQL (`knex migrate:latest`)
-4. **seed** — creates the single starter agent: the fleet-manager (named whatever you chose in the wizard). It provisions all other agents itself, later.
-5. **provision** — wires nginx + certbot for the dashboard, pm2 entries, agent tmux sessions  _(phase C/D)_
-6. **start** — launches the dashboard + agent sessions
+4. **seed fleet-manager** — creates the single starter agent (named whatever you chose in the wizard). It provisions all other agents itself, later.
+5. **seed admin** — creates the dashboard login from `ADMIN_USERNAME`/`ADMIN_PASSWORD`. If you left the password blank, a strong one is generated and **printed once** in the bootstrap output — save it.
+6. **provision** — wires nginx + certbot for the dashboard, pm2 entries
+7. **build** — builds the dashboard SPA (`VITE_API_URL` baked to your domain)
+8. **start** — launches the dashboard + agent sessions
 
 ## 3. Verify
 
 - Dashboard reachable at `https://$DASHBOARD_DOMAIN` (or `http://localhost:$DASHBOARD_APP_PORT` locally)
+- Sign in with `ADMIN_USERNAME` + the password (from the wizard, or the one printed at bootstrap step 5)
 - The fleet-manager shows as `idle` in the roster
 - `GET /healthz` returns `{"ok":true,"db":"up"}`
 

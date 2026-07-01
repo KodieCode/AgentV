@@ -84,6 +84,27 @@ if ! have claude; then
   exit 0
 fi
 
+# Pre-trust the repo in Claude Code's config so freshly-launched agent sessions
+# don't hang on the interactive "Do you trust this folder?" prompt. Trust is
+# keyed at the git-root, so one entry for $AGENTV_ROOT covers every agent dir.
+CLAUDE_JSON="$HOME/.claude.json"
+if have jq && [ -f "$CLAUDE_JSON" ]; then
+  if [ "$(jq -r --arg p "$AGENTV_ROOT" '.projects[$p].hasTrustDialogAccepted // false' "$CLAUDE_JSON")" != "true" ]; then
+    tmp="$(mktemp)"
+    if jq --arg p "$AGENTV_ROOT" \
+         '.projects[$p] = ((.projects[$p] // {}) + {hasTrustDialogAccepted: true})' \
+         "$CLAUDE_JSON" > "$tmp" 2>/dev/null; then
+      mv "$tmp" "$CLAUDE_JSON"
+      echo "  ✓ pre-trusted $AGENTV_ROOT (skips folder-trust prompt)"
+    else
+      rm -f "$tmp"
+      echo "  ! could not pre-trust repo in $CLAUDE_JSON — first agent launch may prompt for folder trust" >&2
+    fi
+  fi
+elif [ ! -f "$CLAUDE_JSON" ]; then
+  echo "  ! $CLAUDE_JSON absent (claude never run?) — agent sessions may hit the folder-trust prompt" >&2
+fi
+
 echo "── launching agent tmux sessions"
 launched=0; alive=0
 # Roster lines: slug:session:dir  (DB-driven, no hardcoded roster)
