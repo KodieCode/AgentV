@@ -1,7 +1,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const fs = require('fs');
-const { execSync } = require('child_process');
+const { execFileSync } = require('child_process');
 const jwt = require('jsonwebtoken');
 const db = require('../db');
 const { jwtAuth, requireAdmin } = require('../middleware/jwtAuth');
@@ -14,6 +14,11 @@ const router = express.Router();
 // failure is logged, never thrown. Path is env-derived (SHARED_DIR), never
 // hardcoded to a particular box.
 const ROUTING_CONF = sharedSkill('notify', 'routing.conf');
+
+// slug + tmux_session end up in shell-adjacent places (tmux targets, notify
+// routing, filesystem paths) — constrain the format at the door. Anything the
+// DB later feeds to a subprocess must have passed this on write.
+const NAME_RE = /^[a-z][a-z0-9_-]{0,63}$/;
 
 async function regenerateRoutingConf() {
   try {
@@ -73,8 +78,10 @@ router.get('/pulse', async (_req, res) => {
   const pulse = {};
   for (const { slug, tmux_session: session } of agentRows) {
     try {
-      execSync(`tmux has-session -t ${session}`, { stdio: 'pipe' });
-      const pane = execSync(`tmux capture-pane -t ${session} -p`, { encoding: 'utf8' });
+      // execFileSync with array args — session names come from the DB and must
+      // never pass through a shell.
+      execFileSync('tmux', ['has-session', '-t', session], { stdio: 'pipe' });
+      const pane = execFileSync('tmux', ['capture-pane', '-t', session, '-p'], { encoding: 'utf8' });
       const lastLines = pane.split('\n').slice(-5).join('\n');
       pulse[slug] = lastLines.includes('esc to interrupt') ? 'busy' : 'idle';
     } catch {
@@ -101,7 +108,7 @@ router.post('/wrap-up-all', requireAdmin, async (_req, res) => {
   for (const a of agents) {
     if (manager && a.slug === manager) continue;
     try {
-      execSync(`${NOTIFY} --to ${a.slug} --wake ${JSON.stringify(MSG)}`, { stdio: 'pipe', timeout: 10_000 });
+      execFileSync('bash', [NOTIFY, '--to', a.slug, '--wake', MSG], { stdio: 'pipe', timeout: 10_000 });
       results.push({ slug: a.slug, ok: true });
     } catch (e) {
       results.push({ slug: a.slug, ok: false, error: e.message.slice(0, 200) });
@@ -307,7 +314,7 @@ router.get('/:slug/prs', (req, res) => {
   const branchPrefix = `agent/${slug}/`;
   try {
     const query = `{ search(query: "org:${org} is:pr is:open", type: ISSUE, first: 100) { nodes { ... on PullRequest { number title url isDraft createdAt headRefName reviewDecision author { login } repository { nameWithOwner name } } } } }`;
-    const raw = execSync(`gh api graphql -f query=${JSON.stringify(query)}`, {
+    const raw = execFileSync('gh', ['api', 'graphql', '-f', `query=${query}`], {
       timeout: 15000, encoding: 'utf8', maxBuffer: 4 * 1024 * 1024,
     });
     const parsed = JSON.parse(raw);
@@ -369,6 +376,12 @@ router.post('/', requireAdmin, async (req, res) => {
     active = true, tmux_session = null, inbox_path = null,
   } = req.body || {};
   if (!slug || !name) return res.status(400).json({ error: 'missing_fields' });
+  if (!NAME_RE.test(slug)) {
+    return res.status(400).json({ error: 'invalid_slug', detail: 'must match ^[a-z][a-z0-9_-]{0,63}$' });
+  }
+  if (tmux_session != null && !NAME_RE.test(tmux_session)) {
+    return res.status(400).json({ error: 'invalid_tmux_session', detail: 'must match ^[a-z][a-z0-9_-]{0,63}$' });
+  }
   const id = crypto.randomUUID();
   await db('agents').insert({
     id, slug, name, description, avatar_url,
@@ -386,6 +399,9 @@ router.patch('/:id', requireAdmin, async (req, res) => {
   const patch = {};
   for (const k of allowed) if (k in (req.body || {})) patch[k] = req.body[k];
   if (!Object.keys(patch).length) return res.status(400).json({ error: 'nothing_to_update' });
+  if ('tmux_session' in patch && patch.tmux_session != null && !NAME_RE.test(patch.tmux_session)) {
+    return res.status(400).json({ error: 'invalid_tmux_session', detail: 'must match ^[a-z][a-z0-9_-]{0,63}$' });
+  }
   patch.updated_at = new Date();
   const n = await db('agents').where({ id }).update(patch);
   if (!n) return res.status(404).json({ error: 'not_found' });
