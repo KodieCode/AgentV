@@ -105,7 +105,9 @@ for v in MYSQL_HOST MYSQL_USER MYSQL_PASSWORD MYSQL_DATABASE; do
   [ -n "${!v:-}" ] || die "$v not set — fill the repo .env before provisioning"
 done
 db_exec() { mysql -h "$MYSQL_HOST" -u "$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" -N -B -e "$1"; }
-sql_esc() { printf '%s' "$1" | sed "s/'/''/g"; }   # escape single quotes for SQL literals
+# Escape a value for use inside a single-quoted SQL literal: backslashes FIRST
+# (MySQL treats \ as an escape char by default), then double the single quotes.
+sql_esc() { printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e "s/'/''/g"; }
 
 # connectivity check up-front (clear failure beats a half-provision)
 if [ "$DRY" = 0 ]; then

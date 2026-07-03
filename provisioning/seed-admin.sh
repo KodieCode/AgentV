@@ -15,10 +15,13 @@ set -euo pipefail
 USERNAME="${ADMIN_USERNAME:-admin}"
 API_DIR="$AGENTV_ROOT/control-plane/api"
 
+# Escape for single-quoted SQL literals: backslashes first, then quotes.
+sql_esc() { printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e "s/'/''/g"; }
+
 echo "── seed dashboard admin ('$USERNAME')"
 
 # Already present? (idempotent re-runs / repeated bootstraps)
-existing="$(agentv_mysql -e "SELECT username FROM users WHERE username='$USERNAME' LIMIT 1;")"
+existing="$(agentv_mysql -e "SELECT username FROM users WHERE username='$(sql_esc "$USERNAME")' LIMIT 1;")"
 if [ -n "$existing" ]; then
   echo "  ✓ admin '$USERNAME' already exists — leaving password unchanged"
   exit 0
@@ -38,7 +41,7 @@ if [ -z "$PASSWORD" ]; then
 fi
 
 HASH="$(cd "$API_DIR" && node -e "console.log(require('bcrypt').hashSync(process.argv[1],10))" "$PASSWORD")"
-agentv_mysql -e "INSERT INTO users (id, username, password_hash) VALUES (UUID(), '$USERNAME', '$HASH');"
+agentv_mysql -e "INSERT INTO users (id, username, password_hash) VALUES (UUID(), '$(sql_esc "$USERNAME")', '$(sql_esc "$HASH")');"
 
 echo "  ✓ admin '$USERNAME' created"
 if [ "$GENERATED" -eq 1 ]; then

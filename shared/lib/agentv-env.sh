@@ -20,8 +20,36 @@ fi
 : "${FLEET_MANAGER_NAME:=Fleet Manager}"        # its display name (operator-chosen: Norman, AgentV, …)
 
 # --- mysql helper (uses .env creds) ---
+# stderr is captured to a log (not silently swallowed — a DB outage must not
+# masquerade as an empty roster with every safety net no-oping). On error a
+# one-line warning goes to the caller's stderr; stdout stays empty so existing
+# callers keep behaving as before.
+: "${AGENTV_MYSQL_ERR_LOG:=$AGENTV_ROOT/.agentv-mysql-errors.log}"
 agentv_mysql() {
-  mysql -h "$MYSQL_HOST" -u "$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" -N -B "$@" 2>/dev/null
+  local _err _rc
+  _err="$(mktemp)" || { mysql -h "$MYSQL_HOST" -u "$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" -N -B "$@" 2>/dev/null; return; }
+  mysql -h "$MYSQL_HOST" -u "$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" -N -B "$@" 2>"$_err"
+  _rc=$?
+  # Drop the noise line mysql prints on every invocation with -p on the CLI.
+  sed -i '/Using a password on the command line/d' "$_err" 2>/dev/null
+  if [ -s "$_err" ] || [ "$_rc" -ne 0 ]; then
+    {
+      echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] agentv_mysql exit=$_rc args: $*"
+      cat "$_err"
+    } >> "$AGENTV_MYSQL_ERR_LOG" 2>/dev/null
+    echo "WARN: agentv_mysql failed (exit $_rc) — see $AGENTV_MYSQL_ERR_LOG" >&2
+  fi
+  rm -f "$_err"
+  return "$_rc"
+}
+
+# Slug guard for helpers that interpolate a caller-supplied slug into SQL.
+# Returns non-zero (and prints nothing) on anything outside the safe charset.
+_agentv_valid_slug() {
+  case "$1" in
+    ''|*[!a-z0-9_-]*) return 1 ;;
+    *) return 0 ;;
+  esac
 }
 
 # --- DB-driven agent roster ---
@@ -37,8 +65,10 @@ agentv_agent_roster() {
 }
 
 # Inbox path for an agent (convention: <dir>/notifications/inbox.jsonl).
+# Slug is caller-supplied — guard before interpolating into SQL.
 agentv_agent_inbox() {
   local slug="$1"
+  _agentv_valid_slug "$slug" || { echo "WARN: agentv_agent_inbox: invalid slug '$slug'" >&2; return 1; }
   agentv_mysql -e "
     SELECT COALESCE(NULLIF(inbox_path,''),
                     CONCAT('$AGENTS_DIR/', slug, '/notifications/inbox.jsonl'))
@@ -47,8 +77,13 @@ agentv_agent_inbox() {
 
 # Model for an agent (from agents.model), falling back to the default. Replaces
 # the legacy agent-model.sh path dependency — skills pass --model from this.
+# Invalid slugs fall back to the default model (callers expect SOME model).
 agentv_agent_model() {
-  local slug="$1" m
-  m=$(agentv_mysql -e "SELECT model FROM agents WHERE slug='$slug' LIMIT 1;")
+  local slug="$1" m=""
+  if _agentv_valid_slug "$slug"; then
+    m=$(agentv_mysql -e "SELECT model FROM agents WHERE slug='$slug' LIMIT 1;")
+  else
+    echo "WARN: agentv_agent_model: invalid slug '$slug' — using default" >&2
+  fi
   [ -n "$m" ] && echo "$m" || echo "$DEFAULT_AGENT_MODEL"
 }
