@@ -1,7 +1,15 @@
 // WebSocket terminal — attaches an xterm.js client to an agent's tmux session
-// via node-pty + `tmux attach-session`. Bidirectional bytes. JWT-gated.
+// via node-pty + `tmux attach-session`. Bidirectional bytes. JWT-gated,
+// ADMIN-ONLY: a pty on an agent session is full interactive control of that
+// agent (and its credentials), so agent tokens are refused — otherwise any
+// agent could drive any other agent's session.
 //
 //   URL: wss://<dashboard-api>/v1/agent/<slug>/terminal?token=<jwt>
+//
+// The JWT travels in the query string because browsers can't set an
+// Authorization header on a WebSocket upgrade. Accepted trade-off: tokens can
+// land in intermediary logs — keep the dashboard behind TLS and treat access
+// logs as sensitive.
 //
 // The slug→session resolution is DB-driven (agents.tmux_session) — NOT a
 // hardcoded map. Adding an agent in the DB makes its terminal work immediately;
@@ -27,10 +35,18 @@ function makeWsServer(httpServer) {
     // JWT in query string (browsers can't set headers on a WS upgrade).
     const url = new URL(req.url, 'http://x');
     const token = url.searchParams.get('token');
+    let payload;
     try {
-      jwt.verify(token, process.env.JWT_SECRET);
+      payload = jwt.verify(token, process.env.JWT_SECRET);
     } catch {
       socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+      socket.destroy();
+      return;
+    }
+    // Admin-only. Legacy role-less tokens count as agents — re-login to attach.
+    if (payload.role !== 'admin') {
+      console.warn(`[terminal] REFUSED non-admin attach slug=${slug} sub=${payload.sub} at ${new Date().toISOString()}`);
+      socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
       socket.destroy();
       return;
     }
@@ -42,13 +58,13 @@ function makeWsServer(httpServer) {
       .then((row) => {
         const session = row && row.tmux_session;
         if (!session) { socket.destroy(); return; }
-        wss.handleUpgrade(req, socket, head, (ws) => handleSession(ws, session, slug));
+        wss.handleUpgrade(req, socket, head, (ws) => handleSession(ws, session, slug, payload.sub));
       })
       .catch(() => socket.destroy());
   });
 }
 
-function handleSession(ws, session, slug) {
+function handleSession(ws, session, slug, sub) {
   // `tmux attach-session -t <session>` in a PTY. We deliberately DON'T pass -d,
   // so a dashboard attach coexists with any other client's attach.
   let term;
@@ -66,7 +82,7 @@ function handleSession(ws, session, slug) {
     return;
   }
 
-  console.log(`[terminal] ws attached to ${slug} (tmux session ${session}) pid=${term.pid}`);
+  console.log(`[terminal] ws attached to ${slug} (tmux session ${session}) by sub=${sub} pid=${term.pid} at ${new Date().toISOString()}`);
 
   term.onData((data) => {
     if (ws.readyState === 1) ws.send(data);
