@@ -52,9 +52,10 @@ Runs, in order:
 3. **migrate** — builds the control-plane schema in your MySQL (`knex migrate:latest`)
 4. **seed fleet-manager** — creates the single starter agent (named whatever you chose in the wizard). It provisions all other agents itself, later.
 5. **seed admin** — creates the dashboard login from `ADMIN_USERNAME`/`ADMIN_PASSWORD`. If you left the password blank, a strong one is generated and **printed once** in the bootstrap output — save it.
-6. **provision** — wires nginx + certbot for the dashboard, pm2 entries
-7. **build** — builds the dashboard SPA (`VITE_API_URL` baked to your domain)
-8. **start** — launches the dashboard + agent sessions
+6. **install safety-net crons** — user-crontab entries for the inbox-watchdog (every 5 min), pane-snapshot (every 10 min), nightly-wrap-up (03:00) and heartbeat (hourly). Idempotent — re-runs never duplicate entries. Skip with `SKIP_CRON_INSTALL=1` if you schedule these yourself (e.g. systemd timers).
+7. **provision** — wires nginx + certbot for the dashboard, pm2 entries
+8. **build** — builds the dashboard SPA (`VITE_API_URL` baked to your domain)
+9. **start** — launches the dashboard + agent sessions
 
 ## 3. Verify
 
