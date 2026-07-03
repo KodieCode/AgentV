@@ -9,6 +9,14 @@ const router = express.Router();
 
 const VALID_STATUS = ['new', 'approved', 'building', 'build_failed', 'pr_open', 'done', 'rejected'];
 
+// Transitions that are HUMAN decisions. 'approved' fires the auto-build,
+// 'done' triggers a server-side `gh pr merge` — an agent token must never be
+// able to approve its own idea or merge its own PR. (The build lifecycle
+// transitions — building / build_failed / pr_open — are set server-side by the
+// agent_build_idea builtin via direct DB writes, so agents don't need any
+// status PATCH for the normal flow.)
+const ADMIN_TRANSITIONS = new Set(['approved', 'done']);
+
 function parsePrUrl(url) {
   if (!url) return null;
   const m = String(url).match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
@@ -121,6 +129,9 @@ router.patch('/:id/status', jwtAuth, async (req, res) => {
   const { status, decision_reason, spec_path, pr_url } = req.body || {};
   if (!VALID_STATUS.includes(status)) {
     return res.status(400).json({ error: 'invalid_status', allowed: VALID_STATUS });
+  }
+  if (ADMIN_TRANSITIONS.has(status) && req.auth_user.role !== 'admin') {
+    return res.status(403).json({ error: 'admin_required', detail: `status '${status}' is an operator decision` });
   }
 
   const current = await db('ideas').where({ id: req.params.id }).first();

@@ -20,8 +20,9 @@ router.post('/login', async (req, res) => {
 
   await db('users').where({ id: user.id }).update({ last_login_at: new Date() });
 
+  // Dashboard logins are operator/human sessions — full access.
   const token = jwt.sign(
-    { sub: user.id, username: user.username },
+    { sub: user.id, username: user.username, role: 'admin' },
     process.env.JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRES_IN || '7d' },
   );

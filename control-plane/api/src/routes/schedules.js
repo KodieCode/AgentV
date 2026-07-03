@@ -1,7 +1,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const db = require('../db');
-const { jwtAuth } = require('../middleware/jwtAuth');
+const { jwtAuth, requireAdmin } = require('../middleware/jwtAuth');
 const { CronExpressionParser } = require('cron-parser');
 
 const router = express.Router();
@@ -33,7 +33,7 @@ router.get('/', async (_req, res) => {
   res.json({ schedules: rows });
 });
 
-router.post('/', async (req, res) => {
+router.post('/', requireAdmin, async (req, res) => {
   const { workflow_id, cron_expr, enabled = true } = req.body || {};
   if (!workflow_id || !cron_expr) return res.status(400).json({ error: 'missing_fields' });
   const next = computeNextFire(cron_expr);
@@ -44,7 +44,7 @@ router.post('/', async (req, res) => {
   res.json({ schedule: row });
 });
 
-router.patch('/:id', async (req, res) => {
+router.patch('/:id', requireAdmin, async (req, res) => {
   const allowed = ['cron_expr', 'enabled'];
   const patch = {};
   for (const k of allowed) if (k in (req.body || {})) patch[k] = req.body[k];
@@ -60,7 +60,7 @@ router.patch('/:id', async (req, res) => {
   res.json({ schedule: row });
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAdmin, async (req, res) => {
   const n = await db('schedules').where({ id: req.params.id }).del();
   if (!n) return res.status(404).json({ error: 'not_found' });
   res.json({ ok: true });

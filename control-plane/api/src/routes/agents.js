@@ -4,7 +4,7 @@ const fs = require('fs');
 const { execSync } = require('child_process');
 const jwt = require('jsonwebtoken');
 const db = require('../db');
-const { jwtAuth } = require('../middleware/jwtAuth');
+const { jwtAuth, requireAdmin } = require('../middleware/jwtAuth');
 const { sharedSkill } = require('../lib/paths');
 
 const router = express.Router();
@@ -39,12 +39,13 @@ async function regenerateRoutingConf() {
 router.use(jwtAuth);
 
 // Issue a long-lived JWT for an agent to authenticate against this API.
-// Caller must be an authenticated human. Token sub = "agent:<slug>".
-router.post('/:slug/token', async (req, res) => {
+// Admin-only: minting is a human decision. Token carries role='agent' +
+// sub=<slug> (matches the direct-sign fallback in provisioning/new-agent.sh).
+router.post('/:slug/token', requireAdmin, async (req, res) => {
   const agent = await db('agents').where({ slug: req.params.slug }).first();
   if (!agent) return res.status(404).json({ error: 'agent_not_found' });
   const token = jwt.sign(
-    { sub: `agent:${agent.slug}`, username: `agent:${agent.slug}`, agent_id: agent.id },
+    { sub: agent.slug, username: agent.slug, role: 'agent', agent_id: agent.id },
     process.env.JWT_SECRET,
     { expiresIn: '1y' },
   );
@@ -86,7 +87,8 @@ router.get('/pulse', async (_req, res) => {
 // Notify all active, provisioned agents to wrap up (e.g. before a group restart).
 // Skips the fleet-manager (FLEET_MANAGER_SLUG) if configured, so it doesn't
 // message itself. notify.sh path + message are env/config-driven, not hardcoded.
-router.post('/wrap-up-all', async (_req, res) => {
+// Admin-only: broadcasting wake prompts into every session is fleet control.
+router.post('/wrap-up-all', requireAdmin, async (_req, res) => {
   const agents = await db('agents')
     .where({ active: true })
     .whereNotNull('tmux_session')
@@ -361,7 +363,7 @@ router.get('/team', async (_req, res) => {
   res.json({ team: result });
 });
 
-router.post('/', async (req, res) => {
+router.post('/', requireAdmin, async (req, res) => {
   const {
     slug, name, description, avatar_url, model,
     active = true, tmux_session = null, inbox_path = null,
@@ -378,7 +380,7 @@ router.post('/', async (req, res) => {
   res.json({ agent: row });
 });
 
-router.patch('/:id', async (req, res) => {
+router.patch('/:id', requireAdmin, async (req, res) => {
   const { id } = req.params;
   const allowed = ['name', 'description', 'avatar_url', 'model', 'active', 'tmux_session', 'inbox_path'];
   const patch = {};
@@ -392,7 +394,7 @@ router.patch('/:id', async (req, res) => {
   res.json({ agent: row });
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAdmin, async (req, res) => {
   const n = await db('agents').where({ id: req.params.id }).del();
   if (!n) return res.status(404).json({ error: 'not_found' });
   regenerateRoutingConf(); // best-effort, no await

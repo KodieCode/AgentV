@@ -1,7 +1,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const db = require('../db');
-const { jwtAuth } = require('../middleware/jwtAuth');
+const { jwtAuth, requireAdmin } = require('../middleware/jwtAuth');
 const { startRun } = require('../lib/runner');
 const { builtins } = require('../lib/builtins');
 
@@ -36,7 +36,7 @@ router.get('/:id', jwtAuth, async (req, res) => {
   res.json({ workflow: row });
 });
 
-router.post('/', jwtAuth, async (req, res) => {
+router.post('/', jwtAuth, requireAdmin, async (req, res) => {
   const { agent_id, slug, name, description, kind = 'manual', builtin_id, config } = req.body || {};
   if (!agent_id || !slug || !name) return res.status(400).json({ error: 'missing_fields' });
   if (kind === 'builtin' && !builtin_id) return res.status(400).json({ error: 'builtin_id_required' });
@@ -49,7 +49,7 @@ router.post('/', jwtAuth, async (req, res) => {
   res.json({ workflow: row });
 });
 
-router.patch('/:id', jwtAuth, async (req, res) => {
+router.patch('/:id', jwtAuth, requireAdmin, async (req, res) => {
   const allowed = ['name', 'description', 'kind', 'builtin_id', 'config', 'active'];
   const patch = {};
   for (const k of allowed) {
@@ -63,13 +63,17 @@ router.patch('/:id', jwtAuth, async (req, res) => {
   res.json({ workflow: row });
 });
 
-router.delete('/:id', jwtAuth, async (req, res) => {
+router.delete('/:id', jwtAuth, requireAdmin, async (req, res) => {
   const n = await db('workflows').where({ id: req.params.id }).del();
   if (!n) return res.status(404).json({ error: 'not_found' });
   res.json({ ok: true });
 });
 
-router.post('/:id/run', jwtAuth, async (req, res) => {
+// Admin-only: firing a workflow executes server-side builtins (build-idea shells
+// claude with repo write access) — an agent must not be able to trigger arbitrary
+// workflows with arbitrary input. The scheduler + idea-approval paths call
+// startRun() in-process and are unaffected.
+router.post('/:id/run', jwtAuth, requireAdmin, async (req, res) => {
   try {
     const runId = await startRun({ workflowId: req.params.id, trigger: 'manual', input: req.body?.input || {} });
     res.json({ runId });
