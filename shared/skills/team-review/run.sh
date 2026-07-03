@@ -28,7 +28,9 @@ Procedure:
 Begin."
 
 echo "[$TS] team-review agent=$AGENT_SLUG"
+EXIT=0
 claude --print "$PROMPT" --model "$MODEL" \
   --allowedTools "Bash,Read,Write,Grep,Glob" \
-  --dangerously-skip-permissions --no-session-persistence --max-budget-usd 2.00 2>&1
-echo "[$TS] team-review exit=$?"
+  --permission-mode auto --no-session-persistence --max-budget-usd 2.00 2>&1 || EXIT=$?
+echo "[$TS] team-review exit=$EXIT"
+exit $EXIT

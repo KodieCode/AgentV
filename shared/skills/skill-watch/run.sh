@@ -29,7 +29,9 @@ Procedure:
 A blank week is healthy — never invent ideas to fill a quota. Submit at most ONE. Begin."
 
 echo "[$TS] skill-watch agent=$AGENT_SLUG"
+EXIT=0
 claude --print "$PROMPT" --model "$MODEL" \
   --allowedTools "Bash,Read,Write,Grep,Glob" \
-  --dangerously-skip-permissions --no-session-persistence --max-budget-usd 1.50 2>&1
-echo "[$TS] skill-watch exit=$?"
+  --permission-mode auto --no-session-persistence --max-budget-usd 1.50 2>&1 || EXIT=$?
+echo "[$TS] skill-watch exit=$EXIT"
+exit $EXIT
