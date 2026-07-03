@@ -20,6 +20,7 @@
 #   --role         "<text>"      required. one-line role description.
 #   --model        <model>       agent model (default: $DEFAULT_AGENT_MODEL).
 #   --tmux         <session>     tmux session name (default: <slug>).
+#   --host         <host>        agents.host — which box the session lives on (default: $FLEET_HOST or 'local').
 #   --inbox        <path>        inbox path (default: AGENTS_DIR/<slug>/notifications/inbox.jsonl).
 #   --reports-to   <text>        reporting line (default: "the fleet-manager").
 #   --fleet-manager <slug>       fleet-manager slug for notify defaults (default: fleet-manager).
@@ -48,7 +49,7 @@ SHARED_SKILLS_REL="../../shared/skills"   # symlink target, relative to <dir>/.c
 # ---------------------------------------------------------------------------
 SLUG=""; NAME=""; ROLE=""
 MODEL="${DEFAULT_AGENT_MODEL:-claude-sonnet-5}"
-TMUX=""; INBOX=""; REPORTS_TO="the fleet-manager"; FLEET_MANAGER="fleet-manager"
+TMUX=""; INBOX=""; HOST="${FLEET_HOST:-local}"; REPORTS_TO="the fleet-manager"; FLEET_MANAGER="fleet-manager"
 SERVER_CODE="CP"; PROJECTS=""; PERSONA=""
 WITH_WORKFLOWS=0; WEEKLY_CRON="30 4 * * 0"
 FORCE=0; REMINT=0; DRY=0
@@ -66,6 +67,7 @@ while [ $# -gt 0 ]; do
     --role)           ROLE="$2"; shift 2 ;;
     --model)          MODEL="$2"; shift 2 ;;
     --tmux)           TMUX="$2"; shift 2 ;;
+    --host)           HOST="$2"; shift 2 ;;
     --inbox)          INBOX="$2"; shift 2 ;;
     --reports-to)     REPORTS_TO="$2"; shift 2 ;;
     --fleet-manager)  FLEET_MANAGER="$2"; shift 2 ;;
@@ -86,6 +88,7 @@ done
 [ -n "$NAME" ] || die "--name is required"
 [ -n "$ROLE" ] || die "--role is required"
 echo "$SLUG" | grep -Eq '^[a-z][a-z0-9-]*$' || die "--slug must be lowercase-kebab-case (got '$SLUG')"
+echo "$HOST" | grep -Eq '^[a-z][a-z0-9_-]{0,31}$' || die "--host must be a short lowercase token (got '$HOST')"
 [ -d "$TEMPLATES_DIR" ] || die "templates dir missing: $TEMPLATES_DIR"
 
 # derived defaults
@@ -120,10 +123,10 @@ fi
 say "[1] agents row"
 AGENT_ID="$(db_exec "SELECT id FROM agents WHERE slug='$(sql_esc "$SLUG")' LIMIT 1;" 2>/dev/null || true)"
 if [ -z "$AGENT_ID" ]; then AGENT_ID="$(uuidgen)"; fi
-SQL_AGENT="INSERT INTO agents (id, slug, name, description, model, active, tmux_session, inbox_path)
-VALUES ('$AGENT_ID','$(sql_esc "$SLUG")','$(sql_esc "$NAME")','$(sql_esc "$ROLE")','$(sql_esc "$MODEL")',1,'$(sql_esc "$TMUX")','$(sql_esc "$INBOX")')
+SQL_AGENT="INSERT INTO agents (id, slug, name, description, model, active, tmux_session, inbox_path, host)
+VALUES ('$AGENT_ID','$(sql_esc "$SLUG")','$(sql_esc "$NAME")','$(sql_esc "$ROLE")','$(sql_esc "$MODEL")',1,'$(sql_esc "$TMUX")','$(sql_esc "$INBOX")','$(sql_esc "$HOST")')
 ON DUPLICATE KEY UPDATE name=VALUES(name), description=VALUES(description), model=VALUES(model),
-  active=1, tmux_session=VALUES(tmux_session), inbox_path=VALUES(inbox_path), updated_at=NOW();"
+  active=1, tmux_session=VALUES(tmux_session), inbox_path=VALUES(inbox_path), host=VALUES(host), updated_at=NOW();"
 if [ "$DRY" = 1 ]; then note "would upsert agents row id=$AGENT_ID"; else
   db_exec "$SQL_AGENT"
   AGENT_ID="$(db_exec "SELECT id FROM agents WHERE slug='$(sql_esc "$SLUG")' LIMIT 1;")"

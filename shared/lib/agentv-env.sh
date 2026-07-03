@@ -18,6 +18,7 @@ fi
 : "${DEFAULT_AGENT_MODEL:=claude-sonnet-5}"
 : "${FLEET_MANAGER_SLUG:=fleet-manager}"        # the coordinating agent's slug
 : "${FLEET_MANAGER_NAME:=Fleet Manager}"        # its display name (operator-chosen: Norman, AgentV, …)
+: "${FLEET_HOST:=local}"                        # this box's agents.host value (multi-host fleets set per box)
 
 # --- mysql helper (uses .env creds) ---
 # stderr is captured to a log (not silently swallowed — a DB outage must not
@@ -53,14 +54,16 @@ _agentv_valid_slug() {
 }
 
 # --- DB-driven agent roster ---
-# Emits one "slug:session:dir" line per active agent with a tmux_session.
-# Replaces every hardcoded AGENTS=( ... ) array in the safety-net skills.
-# dir = AGENTS_DIR/<slug> (identity-dir convention).
+# Emits one "slug:session:dir" line per active agent with a tmux_session ON
+# THIS HOST (agents.host = FLEET_HOST) — tmux checks/launches/wakes only make
+# sense locally. Replaces every hardcoded AGENTS=( ... ) array in the
+# safety-net skills. dir = AGENTS_DIR/<slug> (identity-dir convention).
 agentv_agent_roster() {
   agentv_mysql -e "
     SELECT CONCAT(slug, ':', tmux_session, ':', '$AGENTS_DIR/', slug)
     FROM agents
     WHERE active = 1 AND tmux_session IS NOT NULL AND tmux_session <> ''
+      AND host = '$FLEET_HOST'
     ORDER BY slug;"
 }
 

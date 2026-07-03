@@ -51,9 +51,10 @@ function makeWsServer(httpServer) {
       return;
     }
 
-    // Resolve the tmux session from the DB.
+    // Resolve the tmux session from the DB. Host-scoped: attaching only makes
+    // sense when the agent's tmux session lives on THIS box.
     db('agents')
-      .where({ slug })
+      .where({ slug, host: process.env.FLEET_HOST || 'local' })
       .first('tmux_session')
       .then((row) => {
         const session = row && row.tmux_session;

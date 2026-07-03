@@ -20,6 +20,10 @@ const ROUTING_CONF = sharedSkill('notify', 'routing.conf');
 // DB later feeds to a subprocess must have passed this on write.
 const NAME_RE = /^[a-z][a-z0-9_-]{0,63}$/;
 
+// This box's identity in agents.host — tmux operations (pulse, wrap-up
+// broadcast) only apply to agents whose session lives HERE.
+const FLEET_HOST = process.env.FLEET_HOST || 'local';
+
 async function regenerateRoutingConf() {
   try {
     const agents = await db('agents')
@@ -71,7 +75,7 @@ router.get('/', async (_req, res) => {
 // the last few lines (scrollback produces false positives).
 router.get('/pulse', async (_req, res) => {
   const agentRows = await db('agents')
-    .where({ active: true })
+    .where({ active: true, host: FLEET_HOST })
     .whereNotNull('tmux_session')
     .select('slug', 'tmux_session')
     .orderBy('slug');
@@ -97,7 +101,7 @@ router.get('/pulse', async (_req, res) => {
 // Admin-only: broadcasting wake prompts into every session is fleet control.
 router.post('/wrap-up-all', requireAdmin, async (_req, res) => {
   const agents = await db('agents')
-    .where({ active: true })
+    .where({ active: true, host: FLEET_HOST })
     .whereNotNull('tmux_session')
     .select('slug')
     .orderBy('slug');
