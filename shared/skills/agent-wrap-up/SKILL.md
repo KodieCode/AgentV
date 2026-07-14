@@ -29,6 +29,16 @@ Cover, terse (5–20 lines):
 - **Coordination state** — in-flight notifies, expected replies, PRs awaiting merge
 - **Anything the operator said worth remembering** — preferences, plans
 
+### 1b. Reindex memory-search (if available)
+
+If the `memory-search` skill is symlinked in (`.claude/skills/shared/memory-search/index.py` exists), refresh the FTS5 index now so the note you just wrote is searchable next session:
+
+```bash
+.claude/skills/shared/memory-search/index.py
+```
+
+Skip silently if the skill isn't present — not every fleet has adopted it.
+
 ### 2. Update MEMORY.md (3-tier)
 
 ```markdown

@@ -90,3 +90,59 @@ agentv_agent_model() {
   fi
   [ -n "$m" ] && echo "$m" || echo "$DEFAULT_AGENT_MODEL"
 }
+
+# Runner for an agent (from agents.runner) — which CLI drives the session.
+# 'claude-code' (default), 'codex-cli', 'gemini-cli'. Empty/invalid → default.
+# The column may not exist on a control plane that predates migration 005; the
+# query then errors, m stays empty, and we fall back to claude-code so an
+# un-migrated fleet keeps launching exactly as before.
+agentv_agent_runner() {
+  local slug="$1" r=""
+  if _agentv_valid_slug "$slug"; then
+    r=$(agentv_mysql -e "SELECT runner FROM agents WHERE slug='$slug' LIMIT 1;" 2>/dev/null)
+  fi
+  [ -n "$r" ] && echo "$r" || echo "${DEFAULT_AGENT_RUNNER:-claude-code}"
+}
+
+# Capability profile for an agent (agents.capability_profile) — sandbox level
+# for runners that take one (codex). Empty/invalid → workspace-write.
+agentv_agent_capability() {
+  local slug="$1" c=""
+  if _agentv_valid_slug "$slug"; then
+    c=$(agentv_mysql -e "SELECT capability_profile FROM agents WHERE slug='$slug' LIMIT 1;" 2>/dev/null)
+  fi
+  [ -n "$c" ] && echo "$c" || echo "workspace-write"
+}
+
+# --- launch-command dispatch (single source of truth) ---
+# Emit the shell command that starts an agent's interactive session, branching
+# on its runner. Every launcher — setup/start.sh, session rotation, a manual
+# revive — MUST go through this so a codex/gemini agent is never silently
+# relaunched as Claude Code (the live-fleet tmux-revive bug this design avoids).
+#
+#   agentv_launch_cmd <slug> <display-name> <cwd>
+#
+# Args are the resolved display name + working dir (caller already has them).
+# Model/runner/capability are looked up here from the DB.
+agentv_launch_cmd() {
+  local slug="$1" display="$2" cwd="$3"
+  local model runner cap
+  model="$(agentv_agent_model "$slug")"
+  runner="$(agentv_agent_runner "$slug")"
+  cap="$(agentv_agent_capability "$slug")"
+  case "$runner" in
+    codex-cli)
+      # codex reads its model from ~/.codex/config.toml; --model still honoured.
+      printf 'codex --model %q --sandbox %q --cd %q' "$model" "$cap" "$cwd"
+      ;;
+    gemini-cli)
+      # gemini has no remote-control/model-id parity with claude; yolo approval
+      # + trust skip keep an unattended session moving. Provider creds come from
+      # the agent dir's .env.provider (sourced by the caller before launch).
+      printf 'gemini --approval-mode yolo --skip-trust'
+      ;;
+    claude-code|*)
+      printf 'claude --permission-mode auto --model %q --remote-control %q' "$model" "$display"
+      ;;
+  esac
+}

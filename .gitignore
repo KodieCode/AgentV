@@ -20,3 +20,9 @@ dist/
 **/.claude/skills/shared
 **/dist/
 control-plane/*/dist/
+
+# memory-search FTS5 index — local cache per agent, never committed
+**/data/memory.sqlite
+
+# in-place updater state (applied upgrade-steps ledger + version marker)
+.agentv-version

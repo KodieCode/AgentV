@@ -49,6 +49,7 @@ SHARED_SKILLS_REL="../../shared/skills"   # symlink target, relative to <dir>/.c
 # ---------------------------------------------------------------------------
 SLUG=""; NAME=""; ROLE=""
 MODEL="${DEFAULT_AGENT_MODEL:-claude-sonnet-5}"
+PROVIDER=""; RUNNER=""; CAPABILITY=""   # runtime descriptor; auto-derived from provider if unset
 TMUX=""; INBOX=""; HOST="${FLEET_HOST:-local}"; REPORTS_TO="the fleet-manager"; FLEET_MANAGER="fleet-manager"
 SERVER_CODE="CP"; PROJECTS=""; PERSONA=""
 WITH_WORKFLOWS=0; WEEKLY_CRON="30 4 * * 0"
@@ -66,6 +67,9 @@ while [ $# -gt 0 ]; do
     --name)           NAME="$2"; shift 2 ;;
     --role)           ROLE="$2"; shift 2 ;;
     --model)          MODEL="$2"; shift 2 ;;
+    --provider)       PROVIDER="$2"; shift 2 ;;
+    --runner)         RUNNER="$2"; shift 2 ;;
+    --capability)     CAPABILITY="$2"; shift 2 ;;
     --tmux)           TMUX="$2"; shift 2 ;;
     --host)           HOST="$2"; shift 2 ;;
     --inbox)          INBOX="$2"; shift 2 ;;
@@ -117,16 +121,41 @@ if [ "$DRY" = 0 ]; then
   db_exec "SELECT 1;" >/dev/null 2>&1 || die "cannot reach control-plane DB ($MYSQL_DATABASE@$MYSQL_HOST) — check .env / network"
 fi
 
+# ---------------------------------------------------------------------------
+# runtime descriptor — provider drives runner+capability unless set explicitly.
+# Defaults keep a plain `--provider`-less call identical to the old behaviour
+# (anthropic / claude-code / workspace-write).
+# ---------------------------------------------------------------------------
+[ -n "$PROVIDER" ] || PROVIDER="anthropic"
+if [ -z "$RUNNER" ]; then
+  case "$PROVIDER" in
+    openai)    RUNNER="codex-cli" ;;
+    google)    RUNNER="gemini-cli" ;;
+    anthropic) RUNNER="claude-code" ;;
+    *) die "unknown --provider '$PROVIDER' (anthropic|openai|google) — or pass --runner explicitly" ;;
+  esac
+fi
+if [ -z "$CAPABILITY" ]; then
+  case "$RUNNER" in
+    codex-cli) CAPABILITY="workspace-write" ;;
+    *)         CAPABILITY="workspace-write" ;;
+  esac
+fi
+echo "$PROVIDER"   | grep -Eq '^[a-z][a-z0-9_-]{0,31}$' || die "bad --provider '$PROVIDER'"
+echo "$RUNNER"     | grep -Eq '^[a-z][a-z0-9_-]{0,31}$' || die "bad --runner '$RUNNER'"
+echo "$CAPABILITY" | grep -Eq '^[a-z][a-z0-9_-]{0,31}$' || die "bad --capability '$CAPABILITY'"
+
 # ===========================================================================
 # 1. agents row (upsert on the unique slug key — idempotent)
 # ===========================================================================
 say "[1] agents row"
 AGENT_ID="$(db_exec "SELECT id FROM agents WHERE slug='$(sql_esc "$SLUG")' LIMIT 1;" 2>/dev/null || true)"
 if [ -z "$AGENT_ID" ]; then AGENT_ID="$(uuidgen)"; fi
-SQL_AGENT="INSERT INTO agents (id, slug, name, description, model, active, tmux_session, inbox_path, host)
-VALUES ('$AGENT_ID','$(sql_esc "$SLUG")','$(sql_esc "$NAME")','$(sql_esc "$ROLE")','$(sql_esc "$MODEL")',1,'$(sql_esc "$TMUX")','$(sql_esc "$INBOX")','$(sql_esc "$HOST")')
+SQL_AGENT="INSERT INTO agents (id, slug, name, description, model, active, tmux_session, inbox_path, host, provider, runner, capability_profile)
+VALUES ('$AGENT_ID','$(sql_esc "$SLUG")','$(sql_esc "$NAME")','$(sql_esc "$ROLE")','$(sql_esc "$MODEL")',1,'$(sql_esc "$TMUX")','$(sql_esc "$INBOX")','$(sql_esc "$HOST")','$(sql_esc "$PROVIDER")','$(sql_esc "$RUNNER")','$(sql_esc "$CAPABILITY")')
 ON DUPLICATE KEY UPDATE name=VALUES(name), description=VALUES(description), model=VALUES(model),
-  active=1, tmux_session=VALUES(tmux_session), inbox_path=VALUES(inbox_path), host=VALUES(host), updated_at=NOW();"
+  active=1, tmux_session=VALUES(tmux_session), inbox_path=VALUES(inbox_path), host=VALUES(host),
+  provider=VALUES(provider), runner=VALUES(runner), capability_profile=VALUES(capability_profile), updated_at=NOW();"
 if [ "$DRY" = 1 ]; then note "would upsert agents row id=$AGENT_ID"; else
   db_exec "$SQL_AGENT"
   AGENT_ID="$(db_exec "SELECT id FROM agents WHERE slug='$(sql_esc "$SLUG")' LIMIT 1;")"
