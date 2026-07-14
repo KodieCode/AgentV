@@ -115,17 +115,24 @@ while IFS=':' read -r slug session dir; do
     alive=$((alive+1))
     continue
   fi
-  model="$(agentv_agent_model "$slug")"
   # Friendly display name for Claude Desktop remote-control.
   name="$(agentv_mysql -e "SELECT name FROM agents WHERE slug='$slug' LIMIT 1;")"
   [ -n "$name" ] || name="$slug"
   display="$name ($SERVER_LABEL)"
   cwd="$dir"; [ -d "$cwd" ] || cwd="$AGENTS_DIR/$slug"
 
-  echo "  • starting $slug → '$display'  model=$model  cwd=$cwd"
+  # Launch command is runner-aware (claude-code / codex-cli / gemini-cli) —
+  # resolved centrally so a non-Claude agent is never relaunched as Claude.
+  runner="$(agentv_agent_runner "$slug")"
+  launch_cmd="$(agentv_launch_cmd "$slug" "$display" "$cwd")"
+
+  echo "  • starting $slug → '$display'  runner=$runner  cwd=$cwd"
   tmux new-session -d -s "$session" -c "$cwd"
-  tmux send-keys -t "$session" \
-    "claude --permission-mode auto --model $model --remote-control \"$display\"" Enter
+  # gemini-cli agents source per-agent provider creds before launch.
+  if [ "$runner" = "gemini-cli" ] && [ -f "$cwd/.env.provider" ]; then
+    tmux send-keys -t "$session" "set -a; . ./.env.provider; set +a" Enter
+  fi
+  tmux send-keys -t "$session" "$launch_cmd" Enter
   launched=$((launched+1))
   sleep 8
 done < <(agentv_agent_roster)
