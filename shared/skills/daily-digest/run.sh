@@ -30,10 +30,12 @@ Your job:
 Keep it tight. Begin."
 
 echo "[$TS] daily-digest agent=$AGENT_SLUG"
+EXIT=0
 claude --print "$PROMPT" \
   --model "$MODEL" \
   --allowedTools "Bash,Read,Write,Grep,Glob" \
-  --dangerously-skip-permissions \
+  --permission-mode auto \
   --no-session-persistence \
-  --max-budget-usd 3.00 2>&1
-echo "[$TS] daily-digest exit=$?"
+  --max-budget-usd 3.00 2>&1 || EXIT=$?
+echo "[$TS] daily-digest exit=$EXIT"
+exit $EXIT

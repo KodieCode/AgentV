@@ -49,10 +49,12 @@ Hard rules:
 - One commit only
 - If you can't implement cleanly, output 'BLOCKED: <reason>' and stop"
 
+EXIT=0
 claude --print "$PROMPT" \
   --model "$MODEL" \
   --allowedTools "Bash,Read,Edit,Write,Grep,Glob" \
-  --dangerously-skip-permissions \
+  --permission-mode auto \
   --no-session-persistence \
-  --max-budget-usd 3.00 2>&1
-echo "[$TS] build-idea exit=$?"
+  --max-budget-usd 3.00 2>&1 || EXIT=$?
+echo "[$TS] build-idea exit=$EXIT"
+exit $EXIT

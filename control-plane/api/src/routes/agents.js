@@ -1,10 +1,10 @@
 const express = require('express');
 const crypto = require('crypto');
 const fs = require('fs');
-const { execSync } = require('child_process');
+const { execFileSync } = require('child_process');
 const jwt = require('jsonwebtoken');
 const db = require('../db');
-const { jwtAuth } = require('../middleware/jwtAuth');
+const { jwtAuth, requireAdmin } = require('../middleware/jwtAuth');
 const { sharedSkill } = require('../lib/paths');
 
 const router = express.Router();
@@ -14,6 +14,15 @@ const router = express.Router();
 // failure is logged, never thrown. Path is env-derived (SHARED_DIR), never
 // hardcoded to a particular box.
 const ROUTING_CONF = sharedSkill('notify', 'routing.conf');
+
+// slug + tmux_session end up in shell-adjacent places (tmux targets, notify
+// routing, filesystem paths) — constrain the format at the door. Anything the
+// DB later feeds to a subprocess must have passed this on write.
+const NAME_RE = /^[a-z][a-z0-9_-]{0,63}$/;
+
+// This box's identity in agents.host — tmux operations (pulse, wrap-up
+// broadcast) only apply to agents whose session lives HERE.
+const FLEET_HOST = process.env.FLEET_HOST || 'local';
 
 async function regenerateRoutingConf() {
   try {
@@ -39,12 +48,13 @@ async function regenerateRoutingConf() {
 router.use(jwtAuth);
 
 // Issue a long-lived JWT for an agent to authenticate against this API.
-// Caller must be an authenticated human. Token sub = "agent:<slug>".
-router.post('/:slug/token', async (req, res) => {
+// Admin-only: minting is a human decision. Token carries role='agent' +
+// sub=<slug> (matches the direct-sign fallback in provisioning/new-agent.sh).
+router.post('/:slug/token', requireAdmin, async (req, res) => {
   const agent = await db('agents').where({ slug: req.params.slug }).first();
   if (!agent) return res.status(404).json({ error: 'agent_not_found' });
   const token = jwt.sign(
-    { sub: `agent:${agent.slug}`, username: `agent:${agent.slug}`, agent_id: agent.id },
+    { sub: agent.slug, username: agent.slug, role: 'agent', agent_id: agent.id },
     process.env.JWT_SECRET,
     { expiresIn: '1y' },
   );
@@ -65,15 +75,17 @@ router.get('/', async (_req, res) => {
 // the last few lines (scrollback produces false positives).
 router.get('/pulse', async (_req, res) => {
   const agentRows = await db('agents')
-    .where({ active: true })
+    .where({ active: true, host: FLEET_HOST })
     .whereNotNull('tmux_session')
     .select('slug', 'tmux_session')
     .orderBy('slug');
   const pulse = {};
   for (const { slug, tmux_session: session } of agentRows) {
     try {
-      execSync(`tmux has-session -t ${session}`, { stdio: 'pipe' });
-      const pane = execSync(`tmux capture-pane -t ${session} -p`, { encoding: 'utf8' });
+      // execFileSync with array args — session names come from the DB and must
+      // never pass through a shell.
+      execFileSync('tmux', ['has-session', '-t', session], { stdio: 'pipe' });
+      const pane = execFileSync('tmux', ['capture-pane', '-t', session, '-p'], { encoding: 'utf8' });
       const lastLines = pane.split('\n').slice(-5).join('\n');
       pulse[slug] = lastLines.includes('esc to interrupt') ? 'busy' : 'idle';
     } catch {
@@ -86,9 +98,10 @@ router.get('/pulse', async (_req, res) => {
 // Notify all active, provisioned agents to wrap up (e.g. before a group restart).
 // Skips the fleet-manager (FLEET_MANAGER_SLUG) if configured, so it doesn't
 // message itself. notify.sh path + message are env/config-driven, not hardcoded.
-router.post('/wrap-up-all', async (_req, res) => {
+// Admin-only: broadcasting wake prompts into every session is fleet control.
+router.post('/wrap-up-all', requireAdmin, async (_req, res) => {
   const agents = await db('agents')
-    .where({ active: true })
+    .where({ active: true, host: FLEET_HOST })
     .whereNotNull('tmux_session')
     .select('slug')
     .orderBy('slug');
@@ -99,7 +112,7 @@ router.post('/wrap-up-all', async (_req, res) => {
   for (const a of agents) {
     if (manager && a.slug === manager) continue;
     try {
-      execSync(`${NOTIFY} --to ${a.slug} --wake ${JSON.stringify(MSG)}`, { stdio: 'pipe', timeout: 10_000 });
+      execFileSync('bash', [NOTIFY, '--to', a.slug, '--wake', MSG], { stdio: 'pipe', timeout: 10_000 });
       results.push({ slug: a.slug, ok: true });
     } catch (e) {
       results.push({ slug: a.slug, ok: false, error: e.message.slice(0, 200) });
@@ -305,7 +318,7 @@ router.get('/:slug/prs', (req, res) => {
   const branchPrefix = `agent/${slug}/`;
   try {
     const query = `{ search(query: "org:${org} is:pr is:open", type: ISSUE, first: 100) { nodes { ... on PullRequest { number title url isDraft createdAt headRefName reviewDecision author { login } repository { nameWithOwner name } } } } }`;
-    const raw = execSync(`gh api graphql -f query=${JSON.stringify(query)}`, {
+    const raw = execFileSync('gh', ['api', 'graphql', '-f', `query=${query}`], {
       timeout: 15000, encoding: 'utf8', maxBuffer: 4 * 1024 * 1024,
     });
     const parsed = JSON.parse(raw);
@@ -361,12 +374,18 @@ router.get('/team', async (_req, res) => {
   res.json({ team: result });
 });
 
-router.post('/', async (req, res) => {
+router.post('/', requireAdmin, async (req, res) => {
   const {
     slug, name, description, avatar_url, model,
     active = true, tmux_session = null, inbox_path = null,
   } = req.body || {};
   if (!slug || !name) return res.status(400).json({ error: 'missing_fields' });
+  if (!NAME_RE.test(slug)) {
+    return res.status(400).json({ error: 'invalid_slug', detail: 'must match ^[a-z][a-z0-9_-]{0,63}$' });
+  }
+  if (tmux_session != null && !NAME_RE.test(tmux_session)) {
+    return res.status(400).json({ error: 'invalid_tmux_session', detail: 'must match ^[a-z][a-z0-9_-]{0,63}$' });
+  }
   const id = crypto.randomUUID();
   await db('agents').insert({
     id, slug, name, description, avatar_url,
@@ -378,12 +397,15 @@ router.post('/', async (req, res) => {
   res.json({ agent: row });
 });
 
-router.patch('/:id', async (req, res) => {
+router.patch('/:id', requireAdmin, async (req, res) => {
   const { id } = req.params;
   const allowed = ['name', 'description', 'avatar_url', 'model', 'active', 'tmux_session', 'inbox_path'];
   const patch = {};
   for (const k of allowed) if (k in (req.body || {})) patch[k] = req.body[k];
   if (!Object.keys(patch).length) return res.status(400).json({ error: 'nothing_to_update' });
+  if ('tmux_session' in patch && patch.tmux_session != null && !NAME_RE.test(patch.tmux_session)) {
+    return res.status(400).json({ error: 'invalid_tmux_session', detail: 'must match ^[a-z][a-z0-9_-]{0,63}$' });
+  }
   patch.updated_at = new Date();
   const n = await db('agents').where({ id }).update(patch);
   if (!n) return res.status(404).json({ error: 'not_found' });
@@ -392,7 +414,7 @@ router.patch('/:id', async (req, res) => {
   res.json({ agent: row });
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAdmin, async (req, res) => {
   const n = await db('agents').where({ id: req.params.id }).del();
   if (!n) return res.status(404).json({ error: 'not_found' });
   regenerateRoutingConf(); // best-effort, no await

@@ -32,10 +32,12 @@ Do NOT invent ideas to fill a quota. A blank week is healthy.
 Begin."
 
 echo "[$TS] weekly-review agent=$AGENT_SLUG model=$MODEL"
+EXIT=0
 claude --print "$PROMPT" \
   --model "$MODEL" \
   --allowedTools "Bash,Read,Write,Grep,Glob" \
-  --dangerously-skip-permissions \
+  --permission-mode auto \
   --no-session-persistence \
-  --max-budget-usd 1.50 2>&1
-echo "[$TS] weekly-review exit=$?"
+  --max-budget-usd 1.50 2>&1 || EXIT=$?
+echo "[$TS] weekly-review exit=$EXIT"
+exit $EXIT

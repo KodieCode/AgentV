@@ -52,9 +52,10 @@ Runs, in order:
 3. **migrate** — builds the control-plane schema in your MySQL (`knex migrate:latest`)
 4. **seed fleet-manager** — creates the single starter agent (named whatever you chose in the wizard). It provisions all other agents itself, later.
 5. **seed admin** — creates the dashboard login from `ADMIN_USERNAME`/`ADMIN_PASSWORD`. If you left the password blank, a strong one is generated and **printed once** in the bootstrap output — save it.
-6. **provision** — wires nginx + certbot for the dashboard, pm2 entries
-7. **build** — builds the dashboard SPA (`VITE_API_URL` baked to your domain)
-8. **start** — launches the dashboard + agent sessions
+6. **install safety-net crons** — user-crontab entries for the inbox-watchdog (every 5 min), pane-snapshot (every 10 min), nightly-wrap-up (03:00) and heartbeat (hourly). Idempotent — re-runs never duplicate entries. Skip with `SKIP_CRON_INSTALL=1` if you schedule these yourself (e.g. systemd timers).
+7. **provision** — wires nginx + certbot for the dashboard, pm2 entries
+8. **build** — builds the dashboard SPA (`VITE_API_URL` baked to your domain)
+9. **start** — launches the dashboard + agent sessions
 
 ## 3. Verify
 
@@ -83,6 +84,37 @@ you don't hand-create them.
 > Prereq for remote-control + agent sessions: `claude` must be logged in on the server
 > (one-time). If a session shows "Not logged in", attach once and run `/login`; restarts
 > then auto-register.
+
+## Security model
+
+Two token roles, both HS256 JWTs signed with `JWT_SECRET`:
+
+| | **admin** (operator) | **agent** |
+|---|---|---|
+| Issued by | Dashboard login (`POST /v1/auth/login`); short-lived bootstrap token signed by `new-agent.sh` | `POST /v1/agents/:slug/token` (admin-only) or direct-signed by `new-agent.sh` during bootstrap; stored in each agent's `.api-token` |
+| Lifetime | `JWT_EXPIRES_IN` (default 7d) | 1y |
+| Can | Everything | All GET routes; `POST /v1/ideas` (submit ideas); idea status transitions that aren't operator decisions |
+| Cannot | — | Mint tokens; create/modify/delete agents, workflows, schedules; fire workflow runs; approve ideas or flip them to done (approval fires the auto-build, done triggers the server-side `gh pr merge` — both are **human** decisions); attach to agent terminals; broadcast wrap-up |
+
+Notes:
+
+- **Legacy tokens** (issued before roles existed) carry no `role` claim and are
+  treated as **agent** (least privilege). After upgrading: operators just sign in
+  to the dashboard again; agent `.api-token` files keep working. If an agent
+  token was minted pre-upgrade with the old `sub: agent:<slug>` form it still
+  authenticates — re-mint with `new-agent.sh --remint-token` if you want the
+  canonical claims.
+- The build lifecycle doesn't need agent write access: `agent_build_idea` runs
+  server-side and updates ideas via direct DB writes.
+- The terminal WebSocket and SSE run-stream accept the JWT as a `?token=` query
+  parameter (browsers can't set headers there). Keep the dashboard on TLS and
+  treat access logs as sensitive. Terminal attach is admin-only and logged
+  (slug + token sub + timestamp).
+- Agent `slug` and `tmux_session` are format-validated (`^[a-z][a-z0-9_-]{0,63}$`)
+  at the API and in `new-agent.sh`; everything that reaches a subprocess goes
+  through exec-with-args, never a shell string.
+- Cron-driven skills run `claude` with `--permission-mode auto` (destructive git
+  operations blocked), not `--dangerously-skip-permissions`.
 
 ## Build status (phased)
 
