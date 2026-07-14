@@ -141,8 +141,9 @@ if [ -z "$CAPABILITY" ]; then
     *)         CAPABILITY="workspace-write" ;;
   esac
 fi
-echo "$PROVIDER" | grep -Eq '^[a-z][a-z0-9_-]{0,31}$' || die "bad --provider '$PROVIDER'"
-echo "$RUNNER"   | grep -Eq '^[a-z][a-z0-9_-]{0,31}$' || die "bad --runner '$RUNNER'"
+echo "$PROVIDER"   | grep -Eq '^[a-z][a-z0-9_-]{0,31}$' || die "bad --provider '$PROVIDER'"
+echo "$RUNNER"     | grep -Eq '^[a-z][a-z0-9_-]{0,31}$' || die "bad --runner '$RUNNER'"
+echo "$CAPABILITY" | grep -Eq '^[a-z][a-z0-9_-]{0,31}$' || die "bad --capability '$CAPABILITY'"
 
 # ===========================================================================
 # 1. agents row (upsert on the unique slug key — idempotent)
