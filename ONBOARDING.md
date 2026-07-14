@@ -81,9 +81,62 @@ three ways:
 and **provisions new agents itself** via `provisioning/new-agent.sh` as the work grows —
 you don't hand-create them.
 
-> Prereq for remote-control + agent sessions: `claude` must be logged in on the server
-> (one-time). If a session shows "Not logged in", attach once and run `/login`; restarts
-> then auto-register.
+> Prereq for remote-control + agent sessions: the runner CLI must be logged in on the
+> server (one-time). For Claude-Code agents that's `claude` — if a session shows "Not
+> logged in", attach once and run `/login`; restarts then auto-register. Codex/Gemini
+> agents need their own CLI authenticated (see §5).
+
+## 5. Running non-Claude agents
+
+An agent's **runner** is the CLI that drives its session. AgentV ships three:
+
+| `--provider` | runner | CLI it launches |
+|---|---|---|
+| `anthropic` (default) | `claude-code` | `claude --permission-mode auto --model <model> --remote-control` |
+| `openai` | `codex-cli` | `codex --model <model> --sandbox <capability> --cd <dir>` |
+| `google` | `gemini-cli` | `gemini --approval-mode yolo --skip-trust` |
+
+```bash
+# a Codex agent (runner auto-derived from provider)
+provisioning/new-agent.sh --slug roger --name Roger --role "…" --provider openai --model gpt-5-codex
+
+# override the derived runner / sandbox explicitly if you need to
+provisioning/new-agent.sh --slug gem --name Gem --role "…" --provider google --runner gemini-cli
+```
+
+The launch command is resolved centrally (`agentv_launch_cmd`), so session start,
+rotation, and revive all agree — a Codex/Gemini agent is never relaunched as Claude.
+
+**Prereqs per runner:** each runner's CLI must be installed + authenticated on the box
+(`codex` reads its model from `~/.codex/config.toml`; a Gemini agent sources
+`<agent-dir>/.env.provider` for credentials before launch). Existing agents and any
+`--provider`-less provisioning stay pure Claude Code — nothing changes until you opt in.
+
+## 6. Updating an existing install
+
+Already running a fleet? Pull the newer AgentV and run the updater — it upgrades the
+system **without knocking out running agents**:
+
+```bash
+cd <agentv-repo> && git pull && bash setup/update.sh
+```
+
+`update.sh`: fast-forward pull → dependency install → schema migrate → **capability
+upgrade-steps** → routing regen → safety-net crons → dashboard rebuild → restart the
+**control-plane pm2 procs only**. Your agent tmux sessions are never touched; the script
+lists which agents predate the update so you can rotate them at your convenience (updated
+skill files apply on next use; CLAUDE.md/doctrine changes need a rotate).
+
+**Capability rollouts.** Some upgrades need more than new code on disk — a new skill may
+need a one-time index built, a backfill run, a cron added. Those ship as idempotent,
+ledgered steps in `setup/upgrade-steps/` (e.g. the memory-search FTS5 rollout). The
+updater applies any not-yet-applied step and records it, so re-running is safe and each
+step pays its cost once. Migrations are additive by policy — a column a running agent's
+launcher reads is never dropped or renamed, so a mid-upgrade agent keeps working.
+
+> Guard: `update.sh` refuses to pull over uncommitted changes to tracked files (it won't
+> silently discard your edits) and does a fast-forward-only merge (it stops on divergence
+> for you to resolve). `.env`, `data/`, and `dist/` are untracked and left alone.
 
 ## Security model
 
@@ -123,3 +176,4 @@ Notes:
 - [x] **C — Control-plane dashboard** (api + app, generalised). Verified on the dev box: API boots, `/healthz` green, DB up, scheduler runs, agent-token auth works (`/v1/ideas`, `/v1/agents`, `/v1/reports`); app builds clean (`vite build`).
 - [x] **D — Agent template + fleet-manager + scripted provisioning**. The fleet-manager is the ONLY starter agent; it creates the rest via `new-agent.sh`. Its name/slug are operator-chosen (wizard) and rendered from `agents/_templates/fleet-manager/`. Verified end-to-end (e.g. as "Norman"): DB row, rendered identity (no stray placeholders), symlink resolves, `.api-token` signed + authenticates, notify routing + round-trip, workflows + non-NULL schedules.
 - [x] **E — Bootstrap wired + validated end-to-end**, including a full real run on a server with a live domain: preflight → install → migrate → seed fleet-manager → seed admin → provision (nginx + certbot SSL) → build → start. Dashboard came up on HTTPS with a valid cert, the fleet-manager launched authenticated, and it provisioned a sub-agent that built a live site — proving the self-expanding flow. That run shook out (and fixed) the last real bugs: devDeps skipped under `NODE_ENV=production`, the folder-trust prompt hanging agent launch, a missing dashboard-admin seed, and new agents launching in bypass instead of auto mode.
+- [x] **F — In-place updater + multi-provider runtime** (0.2.0). `setup/update.sh` upgrades an existing install without disturbing running agents; capability rollouts ship as idempotent `setup/upgrade-steps/`. Migration 005 adds the agent runtime descriptor (provider/runner/capability); `new-agent.sh --provider` provisions Claude-Code / Codex / Gemini agents, dispatched centrally by `agentv_launch_cmd`. First capability step rolls out the memory-search FTS5 skill. Tested on a throwaway install; adversarial safety review passed (updater never touches agent sessions; migrations additive).
