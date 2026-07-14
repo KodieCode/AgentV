@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './context/AuthContext.jsx';
+import { api } from './lib/api.js';
 import SidebarAgentList from './components/SidebarAgentList.jsx';
 import { IconRoster, IconIdeas, IconBriefings } from './components/NavIcons.jsx';
 import Login from './pages/Login.jsx';
@@ -61,6 +62,40 @@ function Sidebar({ navOpen }) {
   );
 }
 
+function UpdateBanner() {
+  const [info, setInfo] = useState(null);
+  const [dismissed, setDismissed] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    api.version().then((v) => { if (live) setInfo(v); }).catch(() => {});
+    return () => { live = false; };
+  }, []);
+
+  if (!info?.updateAvailable) return null;
+  // Dismiss is remembered per-version so a newer release re-surfaces it.
+  const key = 'av.updateDismissed';
+  if (!dismissed && localStorage.getItem(key) === info.latest) return null;
+
+  return (
+    <div className="update-banner" role="status">
+      <span>
+        <strong>AgentV {info.latest}</strong> is available
+        {info.current ? ` (you're on ${info.current})` : ''} — run{' '}
+        <code>git pull &amp;&amp; bash setup/update.sh</code>
+      </span>
+      <button
+        type="button"
+        className="update-banner-dismiss"
+        aria-label="Dismiss"
+        onClick={() => { localStorage.setItem(key, info.latest); setDismissed(true); }}
+      >
+        ✕
+      </button>
+    </div>
+  );
+}
+
 function ProtectedShell() {
   const [navOpen, setNavOpen] = useState(false);
   const location = useLocation();
@@ -91,6 +126,7 @@ function ProtectedShell() {
         <span className="mobile-topbar-title">{APP_NAME}</span>
       </div>
       <main className="main">
+        <UpdateBanner />
         <Routes>
           <Route path="/" element={<Navigate to="/roster" replace />} />
           <Route path="/roster" element={<Roster />} />

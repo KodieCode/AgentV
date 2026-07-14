@@ -16,6 +16,7 @@ const projectsRouter = require('./routes/projects');
 const ideasRouter = require('./routes/ideas');
 const runsRouter = require('./routes/runs');
 const reportsRouter = require('./routes/reports');
+const versionRouter = require('./routes/version');
 const { startScheduler } = require('./lib/scheduler');
 
 // .env-less default — the API still boots (e.g. for a healthz probe) if SERVER_PORT
@@ -71,6 +72,7 @@ app.use('/v1/projects', projectsRouter);
 app.use('/v1/ideas', ideasRouter);
 app.use('/v1/runs', runsRouter);
 app.use('/v1/reports', reportsRouter);
+app.use('/v1/version', versionRouter);
 
 app.use((err, _req, res, _next) => {
   console.error('unhandled_error', err);

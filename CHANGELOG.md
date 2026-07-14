@@ -4,6 +4,17 @@ AgentV follows a simple rule for anyone who has cloned it: **`git pull` then
 `bash setup/update.sh`**. The updater migrates the schema, applies capability
 rollouts, and restarts the control-plane **without touching running agents**.
 
+## 0.3.0 — 2026-07-14
+
+### Added
+- **Update notifications (`version-check` skill)** — because every install is a
+  git clone, a nightly cron fetches the tracked branch and compares local
+  `VERSION`/`HEAD` against origin. Result is written to `agentv_meta`
+  (migration 006) and surfaced two ways: a dismissible **dashboard banner**
+  (`GET /v1/version`) and a **non-waking fleet-manager notification** when
+  behind. Notify-only — it never runs the update. Fails safe on
+  offline/detached-HEAD/no-remote (records a reason, reports 0 behind).
+
 ## 0.2.0 — 2026-07-14
 
 ### Added

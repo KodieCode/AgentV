@@ -8,6 +8,7 @@
 #   */10 pane-snapshot    tmux pane audit trail per agent
 #   0 3  nightly-wrap-up  daily memory capture for agents that worked today
 #   0 *  heartbeat        hourly session liveness log
+#   30 6 version-check    nightly "is a newer AgentV available?" (banner + notify)
 #
 # Idempotent: an entry is only appended when its script path isn't already in
 # the crontab (re-runs and hand-edited schedules are left alone).
@@ -32,6 +33,7 @@ ENTRIES=(
   "*/10 * * * * $SK/pane-snapshot/snapshot.sh >/dev/null 2>&1"
   "0 3 * * * $SK/nightly-wrap-up/run.sh >/dev/null 2>&1"
   "0 * * * * $SK/heartbeat/heartbeat.sh >/dev/null 2>&1"
+  "30 6 * * * $SK/version-check/check.sh >/dev/null 2>&1"
 )
 
 current="$(crontab -l 2>/dev/null || true)"

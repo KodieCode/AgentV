@@ -60,6 +60,9 @@ export const api = {
   },
   reportGet: (id) => request(`/v1/reports/${id}`),
 
+  // --- version / update banner ---
+  version: () => request('/v1/version'),
+
   // --- websocket helper for the agent terminal ---
   // Returns a ws(s):// URL for the per-agent terminal endpoint.
   terminalUrl: (slug) => {
