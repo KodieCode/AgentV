@@ -18,8 +18,13 @@ now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 _meta() {
   local k="$1" v="$2"
   v="${v//\'/\'\'}"
-  agentv_mysql -e "INSERT INTO agentv_meta (k, v, updated_at) VALUES ('$k','$v','$now')
-    ON DUPLICATE KEY UPDATE v=VALUES(v), updated_at=VALUES(updated_at);" >/dev/null 2>&1
+  # Must never fail the script: agentv_mysql propagates mysql's exit code, and a
+  # DB blip here would abort under `set -e` — turning a transient outage into a
+  # failing cron. A trailing `|| true` does NOT suspend `set -e` for failures
+  # *inside* the function; an `if` condition does. The write is best-effort —
+  # the banner just stays stale.
+  if agentv_mysql -e "INSERT INTO agentv_meta (k, v, updated_at) VALUES ('$k','$v','$now')
+    ON DUPLICATE KEY UPDATE v=VALUES(v), updated_at=VALUES(updated_at);" >/dev/null 2>&1; then :; fi
 }
 
 _fail() {  # record an error state + a 0 behind-count, then exit clean (not a cron failure)
