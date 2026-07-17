@@ -4,6 +4,18 @@ AgentV follows a simple rule for anyone who has cloned it: **`git pull` then
 `bash setup/update.sh`**. The updater migrates the schema, applies capability
 rollouts, and restarts the control-plane **without touching running agents**.
 
+## 0.4.0 — 2026-07-17
+
+### Added
+- **opencode runner (`opencode-cli`, provider `openrouter`)** — a fourth runner
+  so fleet agents can run on any OpenRouter-accessible model (deepseek, qwen,
+  llama, grok, kimi, gpt…). `new-agent.sh --provider openrouter` derives it;
+  `agentv_launch_cmd` launches the opencode TUI (model + auto-approve from the
+  agent's `opencode.jsonc`, OpenRouter creds from opencode's `auth.json`). Model
+  is stored as the opencode `provider/model` string, e.g.
+  `openrouter/deepseek/deepseek-chat`. Verified end-to-end on the live fleet
+  (real OpenRouter call through the control-plane runtime).
+
 ## 0.3.0 — 2026-07-14
 
 ### Added

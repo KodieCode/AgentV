@@ -141,6 +141,12 @@ agentv_launch_cmd() {
       # the agent dir's .env.provider (sourced by the caller before launch).
       printf 'gemini --approval-mode yolo --skip-trust'
       ;;
+    opencode-cli)
+      # opencode reads its model (openrouter/<model>) + auto-approve permissions
+      # from the agent dir's opencode.jsonc; OpenRouter creds from opencode's
+      # auth.json. Runs any OpenRouter-accessible model.
+      printf 'opencode'
+      ;;
     claude-code|*)
       printf 'claude --permission-mode auto --model %q --remote-control %q' "$model" "$display"
       ;;
