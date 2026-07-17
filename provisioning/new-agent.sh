@@ -129,10 +129,11 @@ fi
 [ -n "$PROVIDER" ] || PROVIDER="anthropic"
 if [ -z "$RUNNER" ]; then
   case "$PROVIDER" in
-    openai)    RUNNER="codex-cli" ;;
-    google)    RUNNER="gemini-cli" ;;
-    anthropic) RUNNER="claude-code" ;;
-    *) die "unknown --provider '$PROVIDER' (anthropic|openai|google) — or pass --runner explicitly" ;;
+    openai)     RUNNER="codex-cli" ;;
+    google)     RUNNER="gemini-cli" ;;
+    openrouter) RUNNER="opencode-cli" ;;
+    anthropic)  RUNNER="claude-code" ;;
+    *) die "unknown --provider '$PROVIDER' (anthropic|openai|google|openrouter) — or pass --runner explicitly" ;;
   esac
 fi
 if [ -z "$CAPABILITY" ]; then
