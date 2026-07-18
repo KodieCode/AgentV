@@ -4,6 +4,16 @@ AgentV follows a simple rule for anyone who has cloned it: **`git pull` then
 `bash setup/update.sh`**. The updater migrates the schema, applies capability
 rollouts, and restarts the control-plane **without touching running agents**.
 
+## 0.5.0 — 2026-07-18
+
+### Added
+- **Cross-host notify** — agents on another box (`agents.host` != this
+  `FLEET_HOST`) now receive messages + wakes. routing.conf carries a `host`
+  column; for an off-box target, notify SSHes to that host to append the inbox
+  + tmux-wake the session, using an ssh alias + remote tmux path from
+  `remote-hosts.conf`. Single-box fleets are unaffected (nothing to configure).
+  Makes multi-host fleets truly two-way — the payoff of the `FLEET_HOST` model.
+
 ## 0.4.2 — 2026-07-18
 
 ### Fixed
