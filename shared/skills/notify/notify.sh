@@ -68,9 +68,17 @@ echo "  queued: [$FROM → $TO] $BODY"
 # Optionally wake the target
 if [ "$WAKE" = "1" ]; then
   if tmux has-session -t "$SESSION" 2>/dev/null; then
-    tmux send-keys -t "$SESSION" "New entry in your inbox — read notifications/inbox.jsonl and action it." Enter
-    sleep 1
-    tmux send-keys -t "$SESSION" Enter
+    WAKE_MSG="New entry in your inbox — read notifications/inbox.jsonl and action it."
+    # opencode's TUI submits on a SINGLE Enter; the double-Enter below (needed by
+    # Claude, whose first Enter only stages) garbles it. Detect opencode agents
+    # by their opencode.jsonc (agent dir = inbox's grandparent).
+    if [ -f "$(dirname "$(dirname "$INBOX")")/opencode.jsonc" ]; then
+      tmux send-keys -t "$SESSION" "$WAKE_MSG" Enter
+    else
+      tmux send-keys -t "$SESSION" "$WAKE_MSG" Enter
+      sleep 1
+      tmux send-keys -t "$SESSION" Enter
+    fi
     echo "  woke: $SESSION"
     # Claim the watchdog marker so the 5-min watchdog doesn't re-fire this same
     # delivered wake (it only wakes when inbox is newer than marker). Watchdog

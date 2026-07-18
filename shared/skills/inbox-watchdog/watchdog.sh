@@ -35,9 +35,15 @@ while IFS=':' read -r slug session dir; do
   if echo "$pane" | grep -q "esc to interrupt"; then echo "  $slug: busy, skip" >> "$LOG"; continue; fi
   if echo "$pane" | grep -qE "❯ [^ ]"; then echo "  $slug: composing, skip" >> "$LOG"; continue; fi
 
-  tmux send-keys -t "$session" "New entry in your inbox — read notifications/inbox.jsonl and action it." Enter
-  sleep 1
-  tmux send-keys -t "$session" Enter
+  wake_msg="New entry in your inbox — read notifications/inbox.jsonl and action it."
+  # opencode's TUI submits on a single Enter; the Claude double-Enter garbles it.
+  if [ -f "$(dirname "$(dirname "$inbox")")/opencode.jsonc" ]; then
+    tmux send-keys -t "$session" "$wake_msg" Enter
+  else
+    tmux send-keys -t "$session" "$wake_msg" Enter
+    sleep 1
+    tmux send-keys -t "$session" Enter
+  fi
   touch "$marker"
   echo "  $slug: WOKE" >> "$LOG"
 done < <(agentv_agent_roster)

@@ -4,6 +4,16 @@ AgentV follows a simple rule for anyone who has cloned it: **`git pull` then
 `bash setup/update.sh`**. The updater migrates the schema, applies capability
 rollouts, and restarts the control-plane **without touching running agents**.
 
+## 0.4.1 — 2026-07-18
+
+### Fixed
+- **opencode wake** — notify.sh + inbox-watchdog now send a single Enter to
+  opencode agents (detected by `opencode.jsonc`). opencode's TUI submits on one
+  Enter; the Claude double-Enter garbled it, so wakes never delivered.
+- **Nightly wrap-up loop** — the activity gate excluded an agent's own
+  `Wrap-up: …` message, so an idle agent no longer wraps up forever off its own
+  previous wrap-up notification.
+
 ## 0.4.0 — 2026-07-17
 
 ### Added

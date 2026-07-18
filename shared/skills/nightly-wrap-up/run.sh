@@ -28,7 +28,10 @@ while IFS=':' read -r slug session dir; do
   tmux has-session -t "$session" 2>/dev/null || continue
 
   active=0
-  if [ -f "$TEAM_ACTIVITY" ] && grep -hE "$YESTERDAY|$TODAY" "$TEAM_ACTIVITY" 2>/dev/null | grep -q "\"from\": \"$slug\""; then
+  # Exclude the agent's OWN wrap-up messages: else last night's "Wrap-up: …"
+  # notification counts as activity and an idle agent wraps up forever off its
+  # own previous wrap-up. Only genuine work qualifies.
+  if [ -f "$TEAM_ACTIVITY" ] && grep -hE "$YESTERDAY|$TODAY" "$TEAM_ACTIVITY" 2>/dev/null | grep "\"from\": \"$slug\"" | grep -viqE '"body": "wrap.?up:'; then
     active=1
   fi
   if [ "$active" -eq 0 ] && [ -d "$dir" ]; then
