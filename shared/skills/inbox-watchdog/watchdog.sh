@@ -5,8 +5,8 @@
 #
 # Polite waiter: skips busy ("esc to interrupt"), skips user-composing, skips
 # empty inboxes (content guard — stops archive-truncate false wakes).
-# Marker (<inbox>.watchdog-marker) records the last wake; re-wakes only when the
-# inbox is newer than the marker AND has content.
+# Marker (<inbox>.watchdog-marker) stores a hash of the inbox content last woken
+# on; re-wakes only when the inbox content actually changes (not on mtime).
 set -u
 . "$(dirname "${BASH_SOURCE[0]}")/../../lib/agentv-env.sh"
 
@@ -25,9 +25,14 @@ while IFS=':' read -r slug session dir; do
   grep -q '[^[:space:]]' "$inbox" 2>/dev/null || continue
 
   marker="${inbox%.jsonl}.watchdog-marker"
-  inbox_mtime=$(stat -c %Y "$inbox" 2>/dev/null || echo 0)
-  marker_mtime=$([ -f "$marker" ] && stat -c %Y "$marker" || echo 0)
-  [ "$inbox_mtime" -le "$marker_mtime" ] && continue
+  # Re-wake guard by CONTENT, not mtime. inbox mtime gets bumped by things other
+  # than new messages (in-place rewrites, fs ops, archive-truncate), and every
+  # bump beat the marker → the watchdog re-fired on an already-woken, UNCHANGED
+  # inbox, repeat-waking idle agents. The marker stores a hash of the inbox
+  # content we last woke on; re-wake only when that content changes.
+  inbox_hash=$(md5sum "$inbox" 2>/dev/null | cut -d' ' -f1)
+  marker_hash=$([ -f "$marker" ] && cat "$marker" 2>/dev/null || echo "")
+  [ -n "$inbox_hash" ] && [ "$inbox_hash" = "$marker_hash" ] && continue
 
   tmux has-session -t "$session" 2>/dev/null || { echo "  $slug: session '$session' down" >> "$LOG"; continue; }
 
@@ -44,6 +49,8 @@ while IFS=':' read -r slug session dir; do
     sleep 1
     tmux send-keys -t "$session" Enter
   fi
-  touch "$marker"
+  # Claim the marker with the CONTENT we just woke on (not a bare touch) so a
+  # later mtime bump with identical content doesn't re-fire.
+  printf '%s\n' "$inbox_hash" > "$marker"
   echo "  $slug: WOKE" >> "$LOG"
 done < <(agentv_agent_roster)
