@@ -83,7 +83,9 @@ if [ "$WAKE" = "1" ]; then
     # Claim the watchdog marker so the 5-min watchdog doesn't re-fire this same
     # delivered wake (it only wakes when inbox is newer than marker). Watchdog
     # stays the net for genuinely MISSED wakes (session down → marker left stale).
-    touch "${INBOX%.jsonl}.watchdog-marker" 2>/dev/null || true
+    # Claim the watchdog marker with the CONTENT hash we just delivered (the
+    # watchdog gates re-wakes on content, not mtime), so it doesn't double-wake.
+    md5sum "$INBOX" 2>/dev/null | cut -d' ' -f1 > "${INBOX%.jsonl}.watchdog-marker" 2>/dev/null || true
   else
     echo "  (session '$SESSION' not running — wake skipped)"
   fi

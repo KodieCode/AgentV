@@ -4,6 +4,15 @@ AgentV follows a simple rule for anyone who has cloned it: **`git pull` then
 `bash setup/update.sh`**. The updater migrates the schema, applies capability
 rollouts, and restarts the control-plane **without touching running agents**.
 
+## 0.4.2 — 2026-07-18
+
+### Fixed
+- **Watchdog re-wake gate now keys on inbox CONTENT, not mtime** (ported from
+  the live fleet). inbox mtime gets bumped by fs ops even when content is
+  unchanged, which repeat-woke idle agents; the marker now stores a content
+  hash and re-wakes only when the content changes. notify.sh claims the marker
+  with the same hash.
+
 ## 0.4.1 — 2026-07-18
 
 ### Fixed
