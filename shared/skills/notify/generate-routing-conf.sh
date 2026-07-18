@@ -11,14 +11,15 @@ OUT="$(dirname "${BASH_SOURCE[0]}")/routing.conf"
 CONTENT=$(agentv_mysql -e "
   SELECT slug,
          COALESCE(NULLIF(inbox_path,''), CONCAT('$AGENTS_DIR/', slug, '/notifications/inbox.jsonl')),
-         tmux_session
+         tmux_session,
+         COALESCE(NULLIF(host,''),'local')
   FROM agents
   WHERE active=1 AND tmux_session IS NOT NULL AND tmux_session <> ''
   ORDER BY slug;")
 
 [ -n "$CONTENT" ] || { echo "ERR: no active agents with a session — seed agents first" >&2; exit 1; }
 
-HEADER="# Auto-generated from the agents table — do not edit manually."$'\n'"# Regenerated: $(date -u +%Y-%m-%dT%H:%M:%SZ)"$'\n'"# Format: slug<TAB>inbox_path<TAB>tmux_session"
+HEADER="# Auto-generated from the agents table — do not edit manually."$'\n'"# Regenerated: $(date -u +%Y-%m-%dT%H:%M:%SZ)"$'\n'"# Format: slug<TAB>inbox_path<TAB>tmux_session<TAB>host"
 
 if [ "${1:-}" = "--dry-run" ]; then
   printf '%s\n%s\n' "$HEADER" "$CONTENT"; echo "(dry-run — not written)"; exit 0
