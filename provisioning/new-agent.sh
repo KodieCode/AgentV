@@ -19,6 +19,10 @@
 #   --name         "<name>"      required. display name.
 #   --role         "<text>"      required. one-line role description.
 #   --model        <model>       agent model (default: $DEFAULT_AGENT_MODEL).
+#   --credential-profile <ref>  runtime credential profile stored on the agents row,
+#                               e.g. env-file:/secure/<provider>.env (default: NULL = ambient login).
+#   --provider-env <path>       env file symlinked to the agent dir as .env.provider
+#                               and sourced by the interactive session at launch (gitignored).
 #   --tmux         <session>     tmux session name (default: <slug>).
 #   --host         <host>        agents.host — which box the session lives on (default: $FLEET_HOST or 'local').
 #   --inbox        <path>        inbox path (default: AGENTS_DIR/<slug>/notifications/inbox.jsonl).
@@ -50,6 +54,7 @@ SHARED_SKILLS_REL="../../shared/skills"   # symlink target, relative to <dir>/.c
 SLUG=""; NAME=""; ROLE=""
 MODEL="${DEFAULT_AGENT_MODEL:-claude-sonnet-5}"
 PROVIDER=""; RUNNER=""; CAPABILITY=""   # runtime descriptor; auto-derived from provider if unset
+CREDENTIAL_PROFILE=""; PROVIDER_ENV=""  # optional: creds pointer on the row + symlinked provider env
 TMUX=""; INBOX=""; HOST="${FLEET_HOST:-local}"; REPORTS_TO="the fleet-manager"; FLEET_MANAGER="fleet-manager"
 SERVER_CODE="CP"; PROJECTS=""; PERSONA=""
 WITH_WORKFLOWS=0; WEEKLY_CRON="30 4 * * 0"
@@ -70,6 +75,8 @@ while [ $# -gt 0 ]; do
     --provider)       PROVIDER="$2"; shift 2 ;;
     --runner)         RUNNER="$2"; shift 2 ;;
     --capability)     CAPABILITY="$2"; shift 2 ;;
+    --credential-profile) CREDENTIAL_PROFILE="$2"; shift 2 ;;
+    --provider-env)   PROVIDER_ENV="$2"; shift 2 ;;
     --tmux)           TMUX="$2"; shift 2 ;;
     --host)           HOST="$2"; shift 2 ;;
     --inbox)          INBOX="$2"; shift 2 ;;
@@ -145,6 +152,7 @@ fi
 echo "$PROVIDER"   | grep -Eq '^[a-z][a-z0-9_-]{0,31}$' || die "bad --provider '$PROVIDER'"
 echo "$RUNNER"     | grep -Eq '^[a-z][a-z0-9_-]{0,31}$' || die "bad --runner '$RUNNER'"
 echo "$CAPABILITY" | grep -Eq '^[a-z][a-z0-9_-]{0,31}$' || die "bad --capability '$CAPABILITY'"
+[ -z "$PROVIDER_ENV" ] || [ -f "$PROVIDER_ENV" ] || die "--provider-env file not found: $PROVIDER_ENV"
 
 # ===========================================================================
 # 1. agents row (upsert on the unique slug key — idempotent)
@@ -152,11 +160,12 @@ echo "$CAPABILITY" | grep -Eq '^[a-z][a-z0-9_-]{0,31}$' || die "bad --capability
 say "[1] agents row"
 AGENT_ID="$(db_exec "SELECT id FROM agents WHERE slug='$(sql_esc "$SLUG")' LIMIT 1;" 2>/dev/null || true)"
 if [ -z "$AGENT_ID" ]; then AGENT_ID="$(uuidgen)"; fi
-SQL_AGENT="INSERT INTO agents (id, slug, name, description, model, active, tmux_session, inbox_path, host, provider, runner, capability_profile)
-VALUES ('$AGENT_ID','$(sql_esc "$SLUG")','$(sql_esc "$NAME")','$(sql_esc "$ROLE")','$(sql_esc "$MODEL")',1,'$(sql_esc "$TMUX")','$(sql_esc "$INBOX")','$(sql_esc "$HOST")','$(sql_esc "$PROVIDER")','$(sql_esc "$RUNNER")','$(sql_esc "$CAPABILITY")')
+SQL_AGENT="INSERT INTO agents (id, slug, name, description, model, active, tmux_session, inbox_path, host, provider, runner, capability_profile, credential_profile)
+VALUES ('$AGENT_ID','$(sql_esc "$SLUG")','$(sql_esc "$NAME")','$(sql_esc "$ROLE")','$(sql_esc "$MODEL")',1,'$(sql_esc "$TMUX")','$(sql_esc "$INBOX")','$(sql_esc "$HOST")','$(sql_esc "$PROVIDER")','$(sql_esc "$RUNNER")','$(sql_esc "$CAPABILITY")',$( [ -n "$CREDENTIAL_PROFILE" ] && printf "'%s'" "$(sql_esc "$CREDENTIAL_PROFILE")" || printf NULL))
 ON DUPLICATE KEY UPDATE name=VALUES(name), description=VALUES(description), model=VALUES(model),
   active=1, tmux_session=VALUES(tmux_session), inbox_path=VALUES(inbox_path), host=VALUES(host),
-  provider=VALUES(provider), runner=VALUES(runner), capability_profile=VALUES(capability_profile), updated_at=NOW();"
+  provider=VALUES(provider), runner=VALUES(runner), capability_profile=VALUES(capability_profile),
+  credential_profile=VALUES(credential_profile), updated_at=NOW();"
 if [ "$DRY" = 1 ]; then note "would upsert agents row id=$AGENT_ID"; else
   db_exec "$SQL_AGENT"
   AGENT_ID="$(db_exec "SELECT id FROM agents WHERE slug='$(sql_esc "$SLUG")' LIMIT 1;")"
@@ -205,6 +214,14 @@ render PROJECT-MAP.md
 if [ "$DRY" = 0 ]; then
   [ -f "$AGENT_DIR/notifications/inbox.jsonl" ] || : > "$AGENT_DIR/notifications/inbox.jsonl"
   note "memory/ + notifications/ ready"
+fi
+# provider env: symlink the operator-supplied env file to .env.provider (gitignored)
+# — setup/start.sh sources it before launching the interactive session.
+if [ -n "$PROVIDER_ENV" ]; then
+  if [ "$DRY" = 1 ]; then note "would link $AGENT_DIR/.env.provider -> $PROVIDER_ENV"; else
+    ln -snf "$PROVIDER_ENV" "$AGENT_DIR/.env.provider"
+    note "provider env linked (gitignored)"
+  fi
 fi
 
 # ===========================================================================

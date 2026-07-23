@@ -4,6 +4,26 @@ AgentV follows a simple rule for anyone who has cloned it: **`git pull` then
 `bash setup/update.sh`**. The updater migrates the schema, applies capability
 rollouts, and restarts the control-plane **without touching running agents**.
 
+## 0.6.0 — 2026-07-23
+
+### Added
+- **`--credential-profile <ref>`** — stores a runtime credential pointer on the
+  agents row (e.g. `env-file:/secure/<provider>.env`); NULL = ambient login.
+  Ports the live-fleet provisioning flag; the column already existed (005) but
+  the provisioner never populated it.
+- **`--provider-env <path>`** — symlinks an operator-supplied env file to the
+  agent dir as `.env.provider` (validated to exist, gitignored). `setup/start.sh`
+  already sources it before launching the interactive session — this wires the
+  provisioning end so a per-agent provider key can be supplied at create time.
+
+### Fixed
+- **`agents.credential_profile` widened varchar(64) → varchar(255)** (migration
+  007). A credential pointer is an absolute path (`env-file:/secure/…`) that
+  overran 64 chars and was silently truncated by MySQL, leaving the launcher to
+  resolve a chopped path. Matches the live-fleet fix.
+- **`.gitignore` now covers `**/.env.*`** — previously `.env.provider` was not
+  matched by `**/.env` and could have been committed.
+
 ## 0.5.0 — 2026-07-18
 
 ### Added
